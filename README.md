@@ -5,13 +5,12 @@ This project is a Go-based application that implements an agent framework using 
 ## Project Structure
 
 *   `/cmd`: Contains project entry points.
-    *   `/adk-wails`: Wails-based desktop application.
     *   `/adk-web`: Web-based interface entry point.
 *   `/core`: Main application logic.
     *   `/agent`: Contains the `AssistantAgent` implementation and LLM instructions.
     *   `/config`: Handles application configuration, including environment variable loading.
     *   `/tools`: Contains specialized tools for the agent (e.g., `listFiles`, `readFile`).
-*   `/scripts`: Scripts for building the project (`build.go`, `build_wails.go`).
+*   `/scripts`: Scripts for building the project (`build.go`).
 
 ## How It Works
 
@@ -20,7 +19,7 @@ The application follows a modular approach to agent development:
 1.  **Agent Logic (`core/agent/`):** The `AssistantAgent` is built using `llmagent`. It is configured with system instructions and provided a set of tools that map to Go functions.
 2.  **Tool Execution (`core/tools/`):** Tools are wrapped in `functiontool` interfaces, allowing the LLM to call them. Each tool (e.g., `ListFiles`, `ReadFile`) implements security checks to ensure file operations are restricted to the project workspace.
 3.  **Configuration (`core/config/`):** The application locates environment variables, such as `GEMINI_API_KEY`.
-4.  **Runtime (`cmd/`):** The project includes multiple entry points, currently supporting a Wails-based desktop app and a web-based interface.
+4.  **Runtime (`cmd/`):** The project currently supports a web-based interface.
 
 ## Features
 
