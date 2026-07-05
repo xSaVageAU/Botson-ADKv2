@@ -2,7 +2,7 @@ package main
 
 import (
 	"botsonv2/core/agent"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -14,22 +14,40 @@ import (
 	"strings"
 )
 
-//go:embed index.html
-var indexHTML string
+//go:embed index.html static/*
+var content embed.FS
 
 var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 func main() {
 	mux := http.NewServeMux()
 
-	// Serves dashboard HTML
+	// Serves dashboard HTML and static files
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
+		if r.URL.Path == "/" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			data, err := content.ReadFile("index.html")
+			if err != nil {
+				http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
+				return
+			}
+			w.Write(data)
+			return
+		}
+
+		filePath := strings.TrimPrefix(r.URL.Path, "/")
+		data, err := content.ReadFile(filePath)
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(indexHTML))
+
+		if strings.HasSuffix(filePath, ".css") {
+			w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		} else if strings.HasSuffix(filePath, ".js") {
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		}
+		w.Write(data)
 	})
 
 	// GET /api/agents - returns list of all agents
