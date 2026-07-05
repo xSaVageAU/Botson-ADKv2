@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
 	adkagent "google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
@@ -95,12 +99,15 @@ func getOrCreateAgent(
 		return LoadedAgent{}, fmt.Errorf("unknown tool or sub-agent %q in %s's config", tName, name)
 	}
 
-	// 3. Create the LLM Agent
+	// 3. Resolve prompt placeholders
+	resolvedPrompt := resolvePlaceholders(instructions[name])
+
+	// 4. Create the LLM Agent
 	createdAgent, err := llmagent.New(llmagent.Config{
 		Name:        cfg.Name,
 		Model:       model,
 		Description: cfg.Description,
-		Instruction: instructions[name],
+		Instruction: resolvedPrompt,
 		Tools:       agentTools,
 	})
 	if err != nil {
@@ -282,5 +289,44 @@ func GetAgentDetails(embeddedFS fs.FS) ([]AgentDetail, error) {
 	}
 
 	return details, nil
+}
+
+// resolvePlaceholders evaluates and replaces dynamic tags inside agent instructions.
+func resolvePlaceholders(prompt string) string {
+	// 1. Resolve {{OS}}
+	osName := runtime.GOOS
+	switch osName {
+	case "windows":
+		osName = "Windows"
+	case "darwin":
+		osName = "macOS"
+	case "linux":
+		osName = "Linux"
+	}
+	prompt = strings.ReplaceAll(prompt, "{{OS}}", osName)
+
+	// 2. Resolve {{DATE}}
+	currentDate := time.Now().Format("January 2, 2006")
+	prompt = strings.ReplaceAll(prompt, "{{DATE}}", currentDate)
+
+	// 3. Resolve {{TIME}}
+	currentTime := time.Now().Format("15:04:05 MST")
+	prompt = strings.ReplaceAll(prompt, "{{TIME}}", currentTime)
+
+	// 4. Resolve {{USER}}
+	username := "User"
+	if u, err := user.Current(); err == nil {
+		username = u.Username
+		if idx := strings.LastIndex(username, "\\"); idx != -1 {
+			username = username[idx+1:]
+		}
+	} else if envUser := os.Getenv("USER"); envUser != "" {
+		username = envUser
+	} else if envUserWin := os.Getenv("USERNAME"); envUserWin != "" {
+		username = envUserWin
+	}
+	prompt = strings.ReplaceAll(prompt, "{{USER}}", username)
+
+	return prompt
 }
 
