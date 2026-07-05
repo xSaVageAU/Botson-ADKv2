@@ -11,6 +11,7 @@ import (
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/agenttool"
 )
 
 // AgentConfig represents the JSON schema of an agent's configuration metadata.
@@ -40,6 +41,79 @@ func GetDataDir() (string, error) {
 	return dataDir, nil
 }
 
+// getOrCreateAgent recursively builds agents, resolving standard tool strings and sub-agent dependencies.
+func getOrCreateAgent(
+	name string,
+	configs map[string]*AgentConfig,
+	instructions map[string]string,
+	built map[string]LoadedAgent,
+	active map[string]bool,
+	model model.LLM,
+) (LoadedAgent, error) {
+	// 1. If already built and cached, return it
+	if la, ok := built[name]; ok {
+		return la, nil
+	}
+
+	// 2. Prevent circular dependencies
+	if active[name] {
+		return LoadedAgent{}, fmt.Errorf("circular dependency detected for agent %s", name)
+	}
+	active[name] = true
+	defer delete(active, name)
+
+	cfg, ok := configs[name]
+	if !ok {
+		return LoadedAgent{}, fmt.Errorf("configuration not found for agent %s", name)
+	}
+
+	var agentTools []tool.Tool
+	for _, tName := range cfg.Tools {
+		// A. Resolve standard Go tools from registry
+		if builder, ok := availableTools[tName]; ok {
+			t, err := builder()
+			if err != nil {
+				return LoadedAgent{}, err
+			}
+			agentTools = append(agentTools, t)
+			continue
+		}
+
+		// B. Resolve other custom agents as tools dynamically
+		if _, isSubAgent := configs[tName]; isSubAgent {
+			subLoaded, err := getOrCreateAgent(tName, configs, instructions, built, active, model)
+			if err != nil {
+				return LoadedAgent{}, err
+			}
+			agentTools = append(agentTools, agenttool.New(subLoaded.Agent, nil))
+			continue
+		}
+
+		return LoadedAgent{}, fmt.Errorf("unknown tool or sub-agent %q in %s's config", tName, name)
+	}
+
+	// 3. Create the LLM Agent
+	createdAgent, err := llmagent.New(llmagent.Config{
+		Name:        cfg.Name,
+		Model:       model,
+		Description: cfg.Description,
+		Instruction: instructions[name],
+		Tools:       agentTools,
+	})
+	if err != nil {
+		return LoadedAgent{}, fmt.Errorf("failed to build agent %s: %w", cfg.Name, err)
+	}
+
+	loaded := LoadedAgent{
+		Agent:  createdAgent,
+		IsRoot: cfg.IsRoot,
+	}
+
+	// Cache the fully built agent
+	built[name] = loaded
+	return loaded, nil
+}
+
 // LoadAgentsFromFS walks a filesystem and parses any agent config subdirectories.
 func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, error) {
 	entries, err := fs.ReadDir(sysFS, ".")
@@ -48,8 +122,10 @@ func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, err
 		return nil, nil
 	}
 
-	loaded := make(map[string]LoadedAgent)
+	configs := make(map[string]*AgentConfig)
+	instructions := make(map[string]string)
 
+	// Pass 1: Scan and load configs and prompts
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -69,45 +145,29 @@ func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, err
 		}
 
 		// Read instructions.md (optional)
-		var instructions string
 		instructionsPath := agentDirName + "/instructions.md"
 		if instBytes, err := fs.ReadFile(sysFS, instructionsPath); err == nil {
-			instructions = string(instBytes)
+			instructions[cfg.Name] = string(instBytes)
 		}
 
-		// Map tools
-		var agentTools []tool.Tool
-		for _, tName := range cfg.Tools {
-			builder, ok := availableTools[tName]
-			if !ok {
-				return nil, fmt.Errorf("unknown tool %s for agent %s", tName, cfg.Name)
-			}
-			t, err := builder()
-			if err != nil {
-				return nil, fmt.Errorf("failed to build tool %s: %w", tName, err)
-			}
-			agentTools = append(agentTools, t)
-		}
+		configs[cfg.Name] = &cfg
+	}
 
-		// Create LLM Agent
-		createdAgent, err := llmagent.New(llmagent.Config{
-			Name:        cfg.Name,
-			Model:       model,
-			Description: cfg.Description,
-			Instruction: instructions,
-			Tools:       agentTools,
-		})
+	// Pass 2: Recursively build agents and resolve tools/sub-agent dependencies
+	built := make(map[string]LoadedAgent)
+	active := make(map[string]bool)
+
+	for name := range configs {
+		if _, ok := built[name]; ok {
+			continue
+		}
+		_, err := getOrCreateAgent(name, configs, instructions, built, active, model)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create agent %s: %w", cfg.Name, err)
-		}
-
-		loaded[cfg.Name] = LoadedAgent{
-			Agent:  createdAgent,
-			IsRoot: cfg.IsRoot,
+			return nil, err
 		}
 	}
 
-	return loaded, nil
+	return built, nil
 }
 
 // LoadAllAgents loads embedded default agents and user agents from ~/.botsonv2/agents/
