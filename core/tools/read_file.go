@@ -39,6 +39,12 @@ func ReadFile(ctx agent.Context, args ReadFileArgs) (ReadFileResult, error) {
 		return ReadFileResult{}, fmt.Errorf("access denied: file path must be inside project workspace")
 	}
 
+	// Block access to the loaded .env file (case-insensitive check)
+	loadedEnvPath := filepath.Clean(filepath.Join(root, ".env"))
+	if strings.EqualFold(filepath.Clean(fullPath), loadedEnvPath) {
+		return ReadFileResult{}, fmt.Errorf("access denied: cannot read configuration environment file")
+	}
+
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		return ReadFileResult{}, fmt.Errorf("failed to read file: %w", err)
