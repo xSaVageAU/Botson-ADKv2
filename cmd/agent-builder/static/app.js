@@ -31,23 +31,30 @@ async function loadTools() {
 
 function renderSidebar() {
   const listEl = document.getElementById('agentList');
+  const countEl = document.getElementById('agentCount');
   listEl.innerHTML = '';
+  countEl.textContent = allAgents.length;
 
   allAgents.forEach(agent => {
     const li = document.createElement('li');
-    li.className = `agent-item ${currentAgent && currentAgent.name === agent.name ? 'active' : ''}`;
+    li.className = `node-row ${currentAgent && currentAgent.name === agent.name ? 'active' : ''}`;
     li.onclick = () => selectAgent(agent);
 
+    const glyphClasses = [
+      'node-glyph',
+      agent.is_root ? 'is-root' : '',
+      agent.private ? 'is-private' : ''
+    ].filter(Boolean).join(' ');
+
     li.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <div class="agent-name">${agent.name}</div>
-        <span class="badge ${agent.read_only ? 'read-only' : ''}" style="margin-left: 8px; flex-shrink: 0;">${agent.read_only ? 'Default' : 'Custom'}</span>
+      <div class="node-row-top">
+        <span class="${glyphClasses}" title="${agent.is_root ? 'root agent' : agent.private ? 'private' : ''}"></span>
+        <span class="node-name">${escapeHtml(agent.name)}</span>
+        <span class="node-tag ${agent.read_only ? '' : 'tag-custom'}">${agent.read_only ? 'default' : 'custom'}</span>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 4px;">
-        <div class="agent-desc-short">${agent.description || 'No description'}</div>
-        ${!agent.read_only ? `
-          <button class="btn-delete" onclick="deleteAgent(event, '${agent.name}')" style="margin-left: 8px; flex-shrink: 0;">Delete</button>
-        ` : ''}
+      <div class="node-row-bottom">
+        <div class="node-desc">${escapeHtml(agent.description || 'No description')}</div>
+        ${!agent.read_only ? `<button class="btn-delete" onclick="deleteAgent(event, '${agent.name}')">Delete</button>` : ''}
       </div>
     `;
     listEl.appendChild(li);
@@ -78,98 +85,134 @@ function renderForm(agentData) {
   const isEdit = agentData.name !== '';
   const workspace = document.getElementById('workspace');
 
-  // Create checkbox lists for tools
   const filteredSubagents = allTools.agents.filter(a => a !== agentData.name);
+  const toolCount = (agentData.tools || []).filter(t => allTools.standard.includes(t)).length;
+  const subCount = (agentData.tools || []).filter(t => filteredSubagents.includes(t)).length;
 
-  let toolsHTML = '';
-  
-  // Standard Tools Section
-  toolsHTML += `
-    <fieldset>
-      <legend>Standard Tools</legend>
-      <div class="grid" style="margin-bottom: 0;">
+  let groupsHTML = '';
+
+  groupsHTML += `
+    <div class="group">
+      <span class="group-title">Standard tools</span>
+      <div class="tools-container">
         ${allTools.standard.map(tool => {
           const checked = agentData.tools && agentData.tools.includes(tool) ? 'checked' : '';
           return `
-            <label style="margin-bottom: 0;">
-              <input type="checkbox" name="agent_tools" value="${tool}" ${checked}>
-              ${tool}
+            <label class="tool-item">
+              <input type="checkbox" name="agent_tools" data-kind="tool" value="${escapeHtml(tool)}" ${checked}>
+              ${escapeHtml(tool)}
             </label>
           `;
-        }).join('')}
+        }).join('') || `<span class="wire-label">no standard tools available</span>`}
       </div>
-    </fieldset>
+    </div>
   `;
 
-  // Sub-Agents delegation Section
   if (filteredSubagents.length > 0) {
-    toolsHTML += `
-      <fieldset>
-        <legend>Sub-Agent Delegation</legend>
-        <div class="grid" style="margin-bottom: 0;">
+    groupsHTML += `
+      <div class="group">
+        <span class="group-title">Sub-agent delegation</span>
+        <div class="tools-container">
           ${filteredSubagents.map(sub => {
             const checked = agentData.tools && agentData.tools.includes(sub) ? 'checked' : '';
             return `
-              <label style="margin-bottom: 0;">
-                <input type="checkbox" name="agent_tools" value="${sub}" ${checked}>
-                ${sub}
+              <label class="tool-item">
+                <input type="checkbox" name="agent_tools" data-kind="sub" value="${escapeHtml(sub)}" ${checked}>
+                ${escapeHtml(sub)}
               </label>
             `;
           }).join('')}
         </div>
-      </fieldset>
+      </div>
     `;
   }
 
   workspace.innerHTML = `
-    <article style="max-width: 800px; margin: 0 auto; padding: 24px;">
-      <header style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 20px;">
-        <h3 style="margin: 0; font-size: 1.25rem;">${isEdit ? `Edit Agent: ${agentData.name}` : 'Create New Agent'}</h3>
-        <span class="badge ${agentData.read_only ? 'read-only' : ''}">${agentData.read_only ? 'Default Agent' : 'Custom Agent'}</span>
-      </header>
+    <div class="editor">
+      <div class="editor-header">
+        <div>
+          <span class="eyebrow">${isEdit ? 'edit agent' : 'new agent'}</span>
+          <h3 id="wireNameHeading">${isEdit ? escapeHtml(agentData.name) : 'Untitled agent'}</h3>
+        </div>
+        <span class="pill ${agentData.read_only ? 'pill-accent' : ''}">${agentData.read_only ? 'Default' : 'Custom'}</span>
+      </div>
 
       ${agentData.read_only ? `
-        <div class="read-only-alert" style="margin-bottom: 20px; background-color: var(--pico-form-element-invalid-focus-color); border: 1px solid var(--pico-form-element-invalid-border-color); padding: 12px; border-radius: var(--pico-border-radius); font-size: 0.85rem;">
-          <strong>Notice:</strong> This is a compiled-in default agent. Saving edits will create a custom override in your home directory.
+        <div class="notice">
+          <span>&#9888;</span>
+          <div><strong>Compiled-in default.</strong> Saving edits will create a custom override in your home directory rather than modifying the built-in agent.</div>
         </div>
       ` : ''}
 
-      <div class="grid">
-        <label>
-          Agent Name (Unique ID)
-          <input type="text" id="agentName" value="${agentData.name}" placeholder="e.g. general_assistant" ${isEdit ? 'disabled' : ''}>
+      <div class="wiring-strip" id="wiringStrip">
+        <div class="wire-node">
+          <span class="wire-dot"></span>
+          <span class="wire-name-label" id="wireNameLabel">${isEdit ? escapeHtml(agentData.name) : 'unnamed'}</span>
+        </div>
+        <div class="wire-trace"></div>
+        <div class="wire-node">
+          <span class="wire-count" id="toolCount">${toolCount}</span>
+          <span class="wire-label">tools wired</span>
+        </div>
+        <div class="wire-trace"></div>
+        <div class="wire-node">
+          <span class="wire-count" id="subCount">${subCount}</span>
+          <span class="wire-label">delegations</span>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="agentName">Agent name (unique ID)</label>
+          <input type="text" id="agentName" value="${escapeAttr(agentData.name)}" placeholder="e.g. general_assistant" ${isEdit ? 'disabled' : ''} oninput="updateWireName()">
+        </div>
+        <div class="field">
+          <label for="agentDesc">Description</label>
+          <input type="text" id="agentDesc" value="${escapeAttr(agentData.description)}" placeholder="e.g. A general helper agent">
+        </div>
+      </div>
+
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="agentIsRoot" ${agentData.is_root ? 'checked' : ''}>
+          Is root agent
         </label>
-        <label>
-          Description
-          <input type="text" id="agentDesc" value="${agentData.description}" placeholder="e.g. A general helper agent">
+        <label class="switch">
+          <input type="checkbox" id="agentIsPrivate" ${agentData.private ? 'checked' : ''}>
+          Private (hide from selector)
         </label>
       </div>
 
-      <fieldset style="display: flex; gap: 40px; margin-bottom: 20px; border: 1px solid var(--pico-border-color); padding: 16px; border-radius: var(--pico-border-radius);">
-        <legend style="padding: 0 8px; font-size: 0.8rem; font-weight: 600;">Configurations</legend>
-        <label style="margin-bottom: 0;">
-          <input type="checkbox" id="agentIsRoot" role="switch" ${agentData.is_root ? 'checked' : ''}>
-          Is Root Agent
-        </label>
-        <label style="margin-bottom: 0;">
-          <input type="checkbox" id="agentIsPrivate" role="switch" ${agentData.private ? 'checked' : ''}>
-          Private (Hide from selector)
-        </label>
-      </fieldset>
+      ${groupsHTML}
 
-      ${toolsHTML}
+      <div class="field" style="margin-bottom: 0;">
+        <label for="agentInstructions">Instructions (system prompt — Markdown)</label>
+        <textarea id="agentInstructions" placeholder="You are a polite assistant...">${agentData.instructions || ''}</textarea>
+      </div>
 
-      <label>
-        Instructions (System Prompt - Markdown)
-        <textarea id="agentInstructions" placeholder="You are a polite assistant..." style="min-height: 150px; font-family: monospace; font-size: 0.9rem;">${agentData.instructions || ''}</textarea>
-      </label>
-
-      <footer style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px;">
-        <button class="secondary" onclick="openNewAgentForm()" style="width: auto; margin-bottom: 0;">Cancel</button>
-        <button onclick="saveAgent()" style="width: auto; margin-bottom: 0;">Save Agent</button>
-      </footer>
-    </article>
+      <div class="editor-actions">
+        <button class="btn" onclick="openNewAgentForm()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAgent()">Save agent</button>
+      </div>
+    </div>
   `;
+
+  document.querySelectorAll('input[name="agent_tools"]').forEach(cb => {
+    cb.addEventListener('change', updateWiringCounts);
+  });
+}
+
+function updateWireName() {
+  const name = document.getElementById('agentName').value.trim();
+  document.getElementById('wireNameLabel').textContent = name || 'unnamed';
+  document.getElementById('wireNameHeading').textContent = name || 'Untitled agent';
+}
+
+function updateWiringCounts() {
+  const toolBoxes = document.querySelectorAll('input[name="agent_tools"][data-kind="tool"]:checked');
+  const subBoxes = document.querySelectorAll('input[name="agent_tools"][data-kind="sub"]:checked');
+  document.getElementById('toolCount').textContent = toolBoxes.length;
+  document.getElementById('subCount').textContent = subBoxes.length;
 }
 
 async function saveAgent() {
@@ -178,7 +221,7 @@ async function saveAgent() {
   const isRootEl = document.getElementById('agentIsRoot');
   const isPrivateEl = document.getElementById('agentIsPrivate');
   const instEl = document.getElementById('agentInstructions');
-  
+
   const selectedTools = [];
   document.querySelectorAll('input[name="agent_tools"]:checked').forEach(cb => {
     selectedTools.push(cb.value);
@@ -205,8 +248,8 @@ async function saveAgent() {
       throw new Error(errMsg || 'Failed to save agent');
     }
 
-    showToast('Agent saved successfully!', 'success');
-    
+    showToast('Agent saved', 'success');
+
     await loadTools();
     await loadAgents();
 
@@ -221,7 +264,7 @@ async function saveAgent() {
 async function deleteAgent(event, name) {
   event.stopPropagation();
 
-  if (!confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) {
     return;
   }
 
@@ -235,16 +278,27 @@ async function deleteAgent(event, name) {
       throw new Error(errMsg || 'Failed to delete agent');
     }
 
-    showToast('Agent deleted successfully', 'success');
-    
+    showToast('Agent deleted', 'success');
+
     if (currentAgent && currentAgent.name === name) {
       currentAgent = null;
       document.getElementById('workspace').innerHTML = `
-        <div class="welcome-container">
-          <div class="welcome-card" style="text-align: center;">
-            <h2>Agent Builder Dashboard</h2>
-            <p>Create and orchestrate agents. Add custom prompts, link tools, and wire up sub-agent delegation. Saving changes automatically updates your local <code>~/.botsonv2/agents/</code> directory.</p>
-          </div>
+        <div class="welcome">
+          <svg class="welcome-diagram" viewBox="0 0 320 120" width="320" height="120" role="presentation" aria-hidden="true">
+            <line x1="40" y1="60" x2="140" y2="30" class="w-trace"></line>
+            <line x1="40" y1="60" x2="140" y2="90" class="w-trace"></line>
+            <line x1="140" y1="30" x2="260" y2="30" class="w-trace"></line>
+            <line x1="140" y1="90" x2="260" y2="60" class="w-trace"></line>
+            <line x1="140" y1="90" x2="260" y2="100" class="w-trace"></line>
+            <circle cx="40" cy="60" r="7" class="w-node w-node-main"></circle>
+            <circle cx="140" cy="30" r="5" class="w-node"></circle>
+            <circle cx="140" cy="90" r="5" class="w-node"></circle>
+            <circle cx="260" cy="30" r="4" class="w-node w-node-dim"></circle>
+            <circle cx="260" cy="60" r="4" class="w-node w-node-dim"></circle>
+            <circle cx="260" cy="100" r="4" class="w-node w-node-dim"></circle>
+          </svg>
+          <h2>Nothing selected yet</h2>
+          <p>Pick an agent from the registry, or create one to start wiring up its prompt, tools, and sub-agent delegation. Changes save straight to your local <code>~/.botsonv2/agents/</code> directory.</p>
         </div>
       `;
     }
@@ -267,4 +321,21 @@ function showToast(message, type = 'success') {
   setTimeout(() => {
     toast.remove();
   }, 3000);
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
