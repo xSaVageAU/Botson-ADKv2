@@ -2,6 +2,8 @@ package agent
 
 import (
 	"botsonv2/core/tools"
+	"sort"
+
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/adk/v2/tool/loadartifactstool"
@@ -33,4 +35,14 @@ var availableTools = map[string]toolBuilder{
 			Description: "Saves a text artifact in the current session (e.g. plans, logs, code, or structured documents).",
 		}, tools.SaveArtifact)
 	},
+}
+
+// GetAvailableTools returns the sorted list of all registered tool names in the registry.
+func GetAvailableTools() []string {
+	var list []string
+	for k := range availableTools {
+		list = append(list, k)
+	}
+	sort.Strings(list)
+	return list
 }

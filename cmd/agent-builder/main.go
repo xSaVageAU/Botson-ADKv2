@@ -181,7 +181,7 @@ func main() {
 		}
 
 		response := map[string][]string{
-			"standard": {"listFiles", "readFile"},
+			"standard": agent.GetAvailableTools(),
 			"agents":   agentNames,
 		}
 
