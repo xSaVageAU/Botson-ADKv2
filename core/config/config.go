@@ -57,3 +57,17 @@ func Load() (*AppConfig, error) {
 		GeminiAPIKey: apiKey,
 	}, nil
 }
+
+// GetDataDir resolves the physical path to ~/.botsonv2/ and ensures it exists.
+func GetDataDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to find home directory: %w", err)
+	}
+	dataDir := filepath.Join(home, ".botsonv2")
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create data directory: %w", err)
+	}
+	return dataDir, nil
+}
+

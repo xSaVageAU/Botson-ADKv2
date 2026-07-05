@@ -3,6 +3,7 @@ package main
 import (
 	"botsonv2/core/agent"
 	"botsonv2/core/config"
+	coresession "botsonv2/core/session"
 	"context"
 	"fmt"
 	"log"
@@ -16,7 +17,6 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher/web/api"
 	"google.golang.org/adk/v2/cmd/launcher/web/webui"
 	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/adk/v2/session"
 )
 
 func main() {
@@ -50,8 +50,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Resolve persistent data directory (~/.botsonv2)
+	dataDir, err := config.GetDataDir()
+	if err != nil {
+		log.Printf("Failed to resolve data directory: %v", err)
+		fmt.Println("Press Enter to exit...")
+		fmt.Scanln()
+		os.Exit(1)
+	}
+
+	// Initialize GORM-backed SQLite session service
+	dbSessionService, err := coresession.InitPersistentSessionService(dataDir)
+	if err != nil {
+		log.Printf("Failed to initialize session database: %v", err)
+		fmt.Println("Press Enter to exit...")
+		fmt.Scanln()
+		os.Exit(1)
+	}
+
 	configLauncher := &launcher.Config{
-		SessionService:  session.InMemoryService(),
+		SessionService:  dbSessionService,
 		ArtifactService: artifact.InMemoryService(),
 		AgentLoader:     loader,
 	}

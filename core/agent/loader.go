@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"botsonv2/core/config"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -32,11 +33,11 @@ type LoadedAgent struct {
 
 // GetDataDir resolves the physical path to ~/.botsonv2/agents/ and ensures it exists.
 func GetDataDir() (string, error) {
-	home, err := os.UserHomeDir()
+	baseDir, err := config.GetDataDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to find home directory: %w", err)
+		return "", err
 	}
-	dataDir := filepath.Join(home, ".botsonv2", "agents")
+	dataDir := filepath.Join(baseDir, "agents")
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create data directory: %w", err)
 	}
