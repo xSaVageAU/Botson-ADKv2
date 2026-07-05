@@ -20,3 +20,9 @@ func LoadDefaultAgents(model model.LLM) (agent.Loader, error) {
 	}
 	return LoadAllAgents(subFS, model)
 }
+
+// GetDefaultAgentsFS returns the embedded default agents filesystem.
+func GetDefaultAgentsFS() embed.FS {
+	return defaultAgentsFS
+}
+

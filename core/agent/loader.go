@@ -230,3 +230,56 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 
 	return adkagent.NewMultiLoader(rootAgent, otherAgents...)
 }
+
+// AgentDetail represents the configuration, instructions, and read-only status of an agent.
+type AgentDetail struct {
+	AgentConfig
+	Instructions string `json:"instructions"`
+	ReadOnly     bool   `json:"read_only"`
+}
+
+// GetAgentDetails returns raw details of all loaded agents from the embedded default filesystem and user home folder.
+func GetAgentDetails(embeddedFS fs.FS) ([]AgentDetail, error) {
+	configs := make(map[string]*AgentConfig)
+	instructions := make(map[string]string)
+	readOnly := make(map[string]bool)
+
+	// 1. Read embedded configurations (marked as read-only)
+	var embeddedConfigs = make(map[string]*AgentConfig)
+	var embeddedInstructions = make(map[string]string)
+	if err := readConfigsFromFS(embeddedFS, embeddedConfigs, embeddedInstructions); err == nil {
+		for name, cfg := range embeddedConfigs {
+			configs[name] = cfg
+			instructions[name] = embeddedInstructions[name]
+			readOnly[name] = true
+		}
+	}
+
+	// 2. Read custom user configurations
+	dataDir, err := GetDataDir()
+	if err == nil {
+		userFS := os.DirFS(dataDir)
+		var userConfigs = make(map[string]*AgentConfig)
+		var userInstructions = make(map[string]string)
+		if err := readConfigsFromFS(userFS, userConfigs, userInstructions); err == nil {
+			for name, cfg := range userConfigs {
+				configs[name] = cfg
+				instructions[name] = userInstructions[name]
+				readOnly[name] = false // User configs override default configs and are not read-only
+			}
+		}
+	}
+
+	// 3. Assemble results list
+	var details []AgentDetail
+	for name, cfg := range configs {
+		details = append(details, AgentDetail{
+			AgentConfig:  *cfg,
+			Instructions: instructions[name],
+			ReadOnly:     readOnly[name],
+		})
+	}
+
+	return details, nil
+}
+
