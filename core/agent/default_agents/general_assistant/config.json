@@ -2,5 +2,5 @@
   "name": "general_assistant",
   "description": "A general-purpose AI assistant designed to help with development tasks and project management.",
   "is_root": true,
-  "tools": ["listFiles", "readFile", "hacker_assistant"]
+  "tools": ["listFiles", "readFile", "saveArtifact", "loadArtifacts", "hacker_assistant"]
 }
