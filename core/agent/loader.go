@@ -19,13 +19,15 @@ type AgentConfig struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	IsRoot      bool     `json:"is_root"`
+	Private     bool     `json:"private"`
 	Tools       []string `json:"tools"`
 }
 
 // LoadedAgent wraps the initialized agent and its loading configurations.
 type LoadedAgent struct {
-	Agent  adkagent.Agent
-	IsRoot bool
+	Agent   adkagent.Agent
+	IsRoot  bool
+	Private bool
 }
 
 // GetDataDir resolves the physical path to ~/.botsonv2/agents/ and ensures it exists.
@@ -105,8 +107,9 @@ func getOrCreateAgent(
 	}
 
 	loaded := LoadedAgent{
-		Agent:  createdAgent,
-		IsRoot: cfg.IsRoot,
+		Agent:   createdAgent,
+		IsRoot:  cfg.IsRoot,
+		Private: cfg.Private,
 	}
 
 	// Cache the fully built agent
@@ -188,7 +191,7 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 		}
 	}
 
-	// 4. Find root agent
+	// 4. Find root agent and compile otherAgents list (filtering out private agents)
 	var rootAgent adkagent.Agent
 	var otherAgents []adkagent.Agent
 
@@ -196,21 +199,30 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 	for _, loaded := range built {
 		if loaded.IsRoot {
 			rootAgent = loaded.Agent
-		} else {
+		} else if !loaded.Private {
 			otherAgents = append(otherAgents, loaded.Agent)
 		}
 	}
 
-	// If no root is explicitly marked, fall back to the first agent in map
+	// If no root is explicitly marked, fall back to the first non-private agent
 	if rootAgent == nil {
 		for _, loaded := range built {
-			rootAgent = loaded.Agent
-			break
+			if !loaded.Private {
+				rootAgent = loaded.Agent
+				break
+			}
 		}
-		// Rebuild otherAgents list excluding the root
+		// If still nil, fall back to the first agent regardless of privacy
+		if rootAgent == nil {
+			for _, loaded := range built {
+				rootAgent = loaded.Agent
+				break
+			}
+		}
+		// Rebuild otherAgents list excluding the root and private agents
 		otherAgents = nil
 		for _, loaded := range built {
-			if loaded.Agent != rootAgent {
+			if loaded.Agent != rootAgent && !loaded.Private {
 				otherAgents = append(otherAgents, loaded.Agent)
 			}
 		}
