@@ -2,6 +2,7 @@ package main
 
 import (
 	"botsonv2/core/agent"
+	coreartifact "botsonv2/core/artifact"
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
 	"context"
@@ -11,7 +12,6 @@ import (
 
 	"google.golang.org/genai"
 
-	"google.golang.org/adk/v2/artifact"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/web"
 	"google.golang.org/adk/v2/cmd/launcher/web/api"
@@ -68,9 +68,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize local filesystem-backed artifact service
+	localArtifactService, err := coreartifact.NewLocalFileService(dataDir)
+	if err != nil {
+		log.Printf("Failed to initialize local artifact service: %v", err)
+		fmt.Println("Press Enter to exit...")
+		fmt.Scanln()
+		os.Exit(1)
+	}
+
 	configLauncher := &launcher.Config{
 		SessionService:  dbSessionService,
-		ArtifactService: artifact.InMemoryService(),
+		ArtifactService: localArtifactService,
 		AgentLoader:     loader,
 	}
 

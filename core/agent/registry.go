@@ -4,6 +4,7 @@ import (
 	"botsonv2/core/tools"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
+	"google.golang.org/adk/v2/tool/loadartifactstool"
 )
 
 // toolBuilder defines a builder function signature for ADK tools.
@@ -22,5 +23,14 @@ var availableTools = map[string]toolBuilder{
 			Name:        "readFile",
 			Description: "Reads the content of a file given its path.",
 		}, tools.ReadFile)
+	},
+	"loadArtifacts": func() (tool.Tool, error) {
+		return loadartifactstool.New(), nil
+	},
+	"saveArtifact": func() (tool.Tool, error) {
+		return functiontool.New(functiontool.Config{
+			Name:        "saveArtifact",
+			Description: "Saves a text artifact in the current session (e.g. plans, logs, code, or structured documents).",
+		}, tools.SaveArtifact)
 	},
 }
