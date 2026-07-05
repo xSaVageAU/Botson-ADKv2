@@ -39,14 +39,14 @@ function renderSidebar() {
     li.onclick = () => selectAgent(agent);
 
     li.innerHTML = `
-      <div class="agent-info">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <div class="agent-name">${agent.name}</div>
-        <div class="agent-desc-short">${agent.description || 'No description'}</div>
+        <span class="badge ${agent.read_only ? 'read-only' : ''}" style="margin-left: 8px; flex-shrink: 0;">${agent.read_only ? 'Default' : 'Custom'}</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="badge ${agent.read_only ? 'read-only' : ''}">${agent.read_only ? 'Default' : 'Custom'}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 4px;">
+        <div class="agent-desc-short">${agent.description || 'No description'}</div>
         ${!agent.read_only ? `
-          <button class="btn-delete" onclick="deleteAgent(event, '${agent.name}')">Delete</button>
+          <button class="btn-delete" onclick="deleteAgent(event, '${agent.name}')" style="margin-left: 8px; flex-shrink: 0;">Delete</button>
         ` : ''}
       </div>
     `;

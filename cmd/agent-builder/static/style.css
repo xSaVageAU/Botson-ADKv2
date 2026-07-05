@@ -11,7 +11,7 @@ body {
 }
 
 aside {
-  width: 260px;
+  width: 280px;
   border-right: 1px solid var(--pico-border-color);
   padding: 16px;
   display: flex;
@@ -58,14 +58,15 @@ main {
 }
 
 .agent-item {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--pico-border-color);
   border-radius: var(--pico-border-radius);
   cursor: pointer;
   background-color: var(--pico-card-background-color);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .agent-item.active {
@@ -84,20 +85,20 @@ main {
 
 .agent-name {
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  flex: 1;
 }
 
 .agent-desc-short {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: var(--pico-muted-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  flex: 1;
 }
 
 .btn-delete {
