@@ -11,9 +11,9 @@ body {
 }
 
 aside {
-  width: 320px;
+  width: 260px;
   border-right: 1px solid var(--pico-border-color);
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -22,15 +22,22 @@ aside {
 }
 
 aside .brand {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 aside .agent-section {
   flex: 1;
   overflow-y: auto;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.btn-create {
+  padding: 8px 12px !important;
+  font-size: 0.85rem !important;
+  margin-bottom: 16px !important;
+  width: 100%;
 }
 
 main {
@@ -51,7 +58,7 @@ main {
 }
 
 .agent-item {
-  padding: 12px 14px;
+  padding: 8px 10px;
   border: 1px solid var(--pico-border-color);
   border-radius: var(--pico-border-radius);
   cursor: pointer;
@@ -63,7 +70,8 @@ main {
 
 .agent-item.active {
   border-color: var(--pico-primary-border);
-  background-color: var(--pico-primary-background);
+  background-color: var(--pico-primary-focus);
+  border-left: 3px solid var(--pico-primary);
 }
 
 .agent-info {
@@ -76,15 +84,20 @@ main {
 
 .agent-name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .agent-desc-short {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--pico-muted-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .btn-delete {
