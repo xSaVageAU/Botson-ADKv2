@@ -114,18 +114,13 @@ func getOrCreateAgent(
 	return loaded, nil
 }
 
-// LoadAgentsFromFS walks a filesystem and parses any agent config subdirectories.
-func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, error) {
+// readConfigsFromFS reads configurations and instructions from a filesystem and loads them into the provided maps.
+func readConfigsFromFS(sysFS fs.FS, configs map[string]*AgentConfig, instructions map[string]string) error {
 	entries, err := fs.ReadDir(sysFS, ".")
 	if err != nil {
-		// Return empty if directory is unreadable or empty
-		return nil, nil
+		return nil // Ignore non-existent or unreadable folder (e.g. empty user folder)
 	}
 
-	configs := make(map[string]*AgentConfig)
-	instructions := make(map[string]string)
-
-	// Pass 1: Scan and load configs and prompts
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -141,7 +136,7 @@ func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, err
 
 		var cfg AgentConfig
 		if err := json.Unmarshal(configBytes, &cfg); err != nil {
-			return nil, fmt.Errorf("failed to parse config for %s: %w", agentDirName, err)
+			return fmt.Errorf("failed to parse config for %s: %w", agentDirName, err)
 		}
 
 		// Read instructions.md (optional)
@@ -153,7 +148,33 @@ func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, err
 		configs[cfg.Name] = &cfg
 	}
 
-	// Pass 2: Recursively build agents and resolve tools/sub-agent dependencies
+	return nil
+}
+
+// LoadAllAgents loads embedded default agents and user agents from ~/.botsonv2/agents/
+func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
+	configs := make(map[string]*AgentConfig)
+	instructions := make(map[string]string)
+
+	// 1. Read embedded agents
+	if err := readConfigsFromFS(embeddedFS, configs, instructions); err != nil {
+		return nil, fmt.Errorf("failed to load embedded configurations: %w", err)
+	}
+
+	// 2. Read custom user agents from disk (overriding embedded ones if they share the same Name)
+	dataDir, err := GetDataDir()
+	if err == nil {
+		userFS := os.DirFS(dataDir)
+		if err := readConfigsFromFS(userFS, configs, instructions); err != nil {
+			return nil, fmt.Errorf("failed to load user configurations: %w", err)
+		}
+	}
+
+	if len(configs) == 0 {
+		return nil, fmt.Errorf("no agents were found in either embedded or user directories")
+	}
+
+	// 3. Build all agents recursively over the combined configurations
 	built := make(map[string]LoadedAgent)
 	active := make(map[string]bool)
 
@@ -167,46 +188,12 @@ func LoadAgentsFromFS(sysFS fs.FS, model model.LLM) (map[string]LoadedAgent, err
 		}
 	}
 
-	return built, nil
-}
-
-// LoadAllAgents loads embedded default agents and user agents from ~/.botsonv2/agents/
-func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
-	// 1. Load embedded agents
-	embeddedAgents, err := LoadAgentsFromFS(embeddedFS, model)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load embedded agents: %w", err)
-	}
-
-	// 2. Load custom user agents from disk
-	userAgents := make(map[string]LoadedAgent)
-	dataDir, err := GetDataDir()
-	if err == nil {
-		userFS := os.DirFS(dataDir)
-		if uAgents, err := LoadAgentsFromFS(userFS, model); err == nil {
-			userAgents = uAgents
-		}
-	}
-
-	// 3. Merge: userAgents override embeddedAgents
-	merged := make(map[string]LoadedAgent)
-	for name, la := range embeddedAgents {
-		merged[name] = la
-	}
-	for name, la := range userAgents {
-		merged[name] = la
-	}
-
-	if len(merged) == 0 {
-		return nil, fmt.Errorf("no agents were loaded")
-	}
-
 	// 4. Find root agent
 	var rootAgent adkagent.Agent
 	var otherAgents []adkagent.Agent
 
 	// Look for explicitly marked is_root
-	for _, loaded := range merged {
+	for _, loaded := range built {
 		if loaded.IsRoot {
 			rootAgent = loaded.Agent
 		} else {
@@ -216,13 +203,13 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 
 	// If no root is explicitly marked, fall back to the first agent in map
 	if rootAgent == nil {
-		for _, loaded := range merged {
+		for _, loaded := range built {
 			rootAgent = loaded.Agent
 			break
 		}
 		// Rebuild otherAgents list excluding the root
 		otherAgents = nil
-		for _, loaded := range merged {
+		for _, loaded := range built {
 			if loaded.Agent != rootAgent {
 				otherAgents = append(otherAgents, loaded.Agent)
 			}
