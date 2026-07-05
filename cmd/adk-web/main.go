@@ -10,7 +10,6 @@ import (
 
 	"google.golang.org/genai"
 
-	adkagent "google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/artifact"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/web"
@@ -43,9 +42,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	assistantAgent, err := agent.NewAssistantAgent(model)
+	loader, err := agent.LoadDefaultAgents(model)
 	if err != nil {
-		log.Printf("Failed to create assistant agent: %v", err)
+		log.Printf("Failed to load agents: %v", err)
 		fmt.Println("Press Enter to exit...")
 		fmt.Scanln()
 		os.Exit(1)
@@ -54,7 +53,7 @@ func main() {
 	configLauncher := &launcher.Config{
 		SessionService:  session.InMemoryService(),
 		ArtifactService: artifact.InMemoryService(),
-		AgentLoader:     adkagent.NewSingleLoader(assistantAgent),
+		AgentLoader:     loader,
 	}
 
 	webLauncher := web.NewLauncher(

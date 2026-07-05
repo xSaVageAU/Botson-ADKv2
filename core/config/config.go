@@ -15,14 +15,22 @@ type AppConfig struct {
 
 // Load loads configuration from the .env file in the executable directory.
 func Load() (*AppConfig, error) {
-	// Set working directory to executable directory for consistency
-	exePath, err := os.Executable()
-	if err == nil {
-		os.Chdir(filepath.Dir(exePath))
+	var envData []byte
+	var err error
+
+	// 1. Try reading .env in current working directory (e.g., go run during development)
+	if envData, err = os.ReadFile(".env"); err != nil {
+		// 2. Fall back to executable directory (e.g., compiled production binary)
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			if envData, err = os.ReadFile(filepath.Join(exeDir, ".env")); err == nil {
+				os.Chdir(exeDir)
+			}
+		}
 	}
 
-	// Load .env file
-	if envData, err := os.ReadFile(".env"); err == nil {
+	// Parse .env file if successfully loaded
+	if envData != nil {
 		for _, line := range strings.Split(string(envData), "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" || strings.HasPrefix(line, "#") {
