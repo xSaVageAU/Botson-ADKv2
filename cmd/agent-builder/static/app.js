@@ -79,86 +79,96 @@ function renderForm(agentData) {
   const workspace = document.getElementById('workspace');
 
   // Create checkbox lists for tools
-  // Do not list yourself as a delegatable subagent
   const filteredSubagents = allTools.agents.filter(a => a !== agentData.name);
 
   let toolsHTML = '';
   
   // Standard Tools Section
-  toolsHTML += '<div class="field-group" style="grid-column: 1 / -1;"><label>Standard Tools</label><div class="tools-grid">';
-  allTools.standard.forEach(tool => {
-    const checked = agentData.tools && agentData.tools.includes(tool) ? 'checked' : '';
-    toolsHTML += `
-      <label class="tool-checkbox">
-        <input type="checkbox" name="agent_tools" value="${tool}" ${checked}>
-        ${tool}
-      </label>
-    `;
-  });
-  toolsHTML += '</div></div>';
+  toolsHTML += `
+    <fieldset>
+      <legend>Standard Tools</legend>
+      <div class="grid" style="margin-bottom: 0;">
+        ${allTools.standard.map(tool => {
+          const checked = agentData.tools && agentData.tools.includes(tool) ? 'checked' : '';
+          return `
+            <label style="margin-bottom: 0;">
+              <input type="checkbox" name="agent_tools" value="${tool}" ${checked}>
+              ${tool}
+            </label>
+          `;
+        }).join('')}
+      </div>
+    </fieldset>
+  `;
 
   // Sub-Agents delegation Section
   if (filteredSubagents.length > 0) {
-    toolsHTML += '<div class="field-group" style="grid-column: 1 / -1;"><label>Sub-Agent Delegation</label><div class="tools-grid">';
-    filteredSubagents.forEach(sub => {
-      const checked = agentData.tools && agentData.tools.includes(sub) ? 'checked' : '';
-      toolsHTML += `
-        <label class="tool-checkbox">
-          <input type="checkbox" name="agent_tools" value="${sub}" ${checked}>
-          ${sub}
-        </label>
-      `;
-    });
-    toolsHTML += '</div></div>';
+    toolsHTML += `
+      <fieldset>
+        <legend>Sub-Agent Delegation</legend>
+        <div class="grid" style="margin-bottom: 0;">
+          ${filteredSubagents.map(sub => {
+            const checked = agentData.tools && agentData.tools.includes(sub) ? 'checked' : '';
+            return `
+              <label style="margin-bottom: 0;">
+                <input type="checkbox" name="agent_tools" value="${sub}" ${checked}>
+                ${sub}
+              </label>
+            `;
+          }).join('')}
+        </div>
+      </fieldset>
+    `;
   }
 
   workspace.innerHTML = `
-    <div class="editor-container">
-      <div class="editor-header">
-        <h3 class="editor-title">${isEdit ? `Edit Agent: ${agentData.name}` : 'Create New Agent'}</h3>
+    <article style="max-width: 800px; margin: 0 auto; padding: 24px;">
+      <header style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; margin-bottom: 20px;">
+        <h3 style="margin: 0; font-size: 1.25rem;">${isEdit ? `Edit Agent: ${agentData.name}` : 'Create New Agent'}</h3>
         <span class="badge ${agentData.read_only ? 'read-only' : ''}">${agentData.read_only ? 'Default Agent' : 'Custom Agent'}</span>
-      </div>
+      </header>
 
       ${agentData.read_only ? `
-        <div class="read-only-alert">
-          <strong>Notice:</strong> This is a compiled-in default agent. Saving edits will create a custom override in your home directory, keeping the original default intact.
+        <div class="read-only-alert" style="margin-bottom: 20px; background-color: var(--pico-form-element-invalid-focus-color); border: 1px solid var(--pico-form-element-invalid-border-color); padding: 12px; border-radius: var(--pico-border-radius); font-size: 0.85rem;">
+          <strong>Notice:</strong> This is a compiled-in default agent. Saving edits will create a custom override in your home directory.
         </div>
       ` : ''}
 
-      <div class="field-row">
-        <div class="field-group">
-          <label for="agentName">Agent Name (Unique ID)</label>
+      <div class="grid">
+        <label>
+          Agent Name (Unique ID)
           <input type="text" id="agentName" value="${agentData.name}" placeholder="e.g. general_assistant" ${isEdit ? 'disabled' : ''}>
-        </div>
-        <div class="field-group">
-          <label for="agentDesc">Description</label>
+        </label>
+        <label>
+          Description
           <input type="text" id="agentDesc" value="${agentData.description}" placeholder="e.g. A general helper agent">
-        </div>
+        </label>
       </div>
 
-      <div class="toggle-row">
-        <label class="toggle-item">
-          <input type="checkbox" id="agentIsRoot" ${agentData.is_root ? 'checked' : ''}>
-          <span>Is Root Agent (Default Launch)</span>
+      <fieldset style="display: flex; gap: 40px; margin-bottom: 20px; border: 1px solid var(--pico-border-color); padding: 16px; border-radius: var(--pico-border-radius);">
+        <legend style="padding: 0 8px; font-size: 0.8rem; font-weight: 600;">Configurations</legend>
+        <label style="margin-bottom: 0;">
+          <input type="checkbox" id="agentIsRoot" role="switch" ${agentData.is_root ? 'checked' : ''}>
+          Is Root Agent
         </label>
-        <label class="toggle-item">
-          <input type="checkbox" id="agentIsPrivate" ${agentData.private ? 'checked' : ''}>
-          <span>Private (Hide from Web UI selector)</span>
+        <label style="margin-bottom: 0;">
+          <input type="checkbox" id="agentIsPrivate" role="switch" ${agentData.private ? 'checked' : ''}>
+          Private (Hide from selector)
         </label>
-      </div>
+      </fieldset>
 
       ${toolsHTML}
 
-      <div class="field-group">
-        <label for="agentInstructions">Instructions (System Prompt - Markdown)</label>
-        <textarea id="agentInstructions" placeholder="You are a polite assistant...">${agentData.instructions || ''}</textarea>
-      </div>
+      <label>
+        Instructions (System Prompt - Markdown)
+        <textarea id="agentInstructions" placeholder="You are a polite assistant..." style="min-height: 150px; font-family: monospace; font-size: 0.9rem;">${agentData.instructions || ''}</textarea>
+      </label>
 
-      <div class="form-actions">
-        <button class="btn btn-secondary" onclick="openNewAgentForm()">Cancel</button>
-        <button class="btn btn-save" onclick="saveAgent()">Save Agent</button>
-      </div>
-    </div>
+      <footer style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px;">
+        <button class="secondary" onclick="openNewAgentForm()" style="width: auto; margin-bottom: 0;">Cancel</button>
+        <button onclick="saveAgent()" style="width: auto; margin-bottom: 0;">Save Agent</button>
+      </footer>
+    </article>
   `;
 }
 
@@ -197,11 +207,9 @@ async function saveAgent() {
 
     showToast('Agent saved successfully!', 'success');
     
-    // Reload tools list (since a new agent can now be a subagent tool)
     await loadTools();
     await loadAgents();
 
-    // Select the newly saved agent
     const matched = allAgents.find(a => a.name === payload.name);
     if (matched) selectAgent(matched);
 
@@ -211,7 +219,7 @@ async function saveAgent() {
 }
 
 async function deleteAgent(event, name) {
-  event.stopPropagation(); // Avoid triggering list select
+  event.stopPropagation();
 
   if (!confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) {
     return;
@@ -233,7 +241,7 @@ async function deleteAgent(event, name) {
       currentAgent = null;
       document.getElementById('workspace').innerHTML = `
         <div class="welcome-container">
-          <div class="welcome-card">
+          <div class="welcome-card" style="text-align: center;">
             <h2>Agent Builder Dashboard</h2>
             <p>Create and orchestrate agents. Add custom prompts, link tools, and wire up sub-agent delegation. Saving changes automatically updates your local <code>~/.botsonv2/agents/</code> directory.</p>
           </div>

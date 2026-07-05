@@ -1,56 +1,44 @@
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-container {
   display: flex;
   height: 100vh;
+  width: 100vw;
 }
 
 aside {
-  width: 280px;
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  width: 320px;
+  border-right: 1px solid var(--pico-border-color);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  height: 100%;
   box-sizing: border-box;
+  background-color: var(--pico-background-color);
 }
 
-.brand {
+aside .brand {
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 20px;
 }
 
-.btn-create {
-  width: 100%;
-  padding: 10px;
-  background-color: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
+aside .agent-section {
+  flex: 1;
+  overflow-y: auto;
   margin-bottom: 20px;
 }
 
-.btn-create:hover {
-  background-color: #1d4ed8;
-}
-
-.agent-section {
+main {
   flex: 1;
+  padding: 30px;
   overflow-y: auto;
-}
-
-.section-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .agent-list {
@@ -63,23 +51,19 @@ aside {
 }
 
 .agent-item {
+  padding: 12px 14px;
+  border: 1px solid var(--pico-border-color);
+  border-radius: var(--pico-border-radius);
+  cursor: pointer;
+  background-color: var(--pico-card-background-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  cursor: pointer;
-  background-color: #f8fafc;
-}
-
-.agent-item:hover {
-  background-color: #f1f5f9;
 }
 
 .agent-item.active {
-  border-color: #2563eb;
-  background-color: #eff6ff;
+  border-color: var(--pico-primary-border);
+  background-color: var(--pico-primary-background);
 }
 
 .agent-info {
@@ -87,6 +71,7 @@ aside {
   flex-direction: column;
   gap: 2px;
   overflow: hidden;
+  flex: 1;
 }
 
 .agent-name {
@@ -96,10 +81,27 @@ aside {
 
 .agent-desc-short {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--pico-muted-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.btn-delete {
+  background: none !important;
+  border: none !important;
+  color: var(--pico-form-element-invalid-active-border-color) !important;
+  cursor: pointer;
+  font-size: 0.8rem !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  box-shadow: none !important;
+}
+
+.btn-delete:hover {
+  text-decoration: underline !important;
+  background: none !important;
 }
 
 .badge {
@@ -107,34 +109,43 @@ aside {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
-  background-color: #e2e8f0;
-  color: #475569;
+  background-color: var(--pico-border-color);
+  color: var(--pico-color);
+  display: inline-block;
 }
 
 .badge.read-only {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: var(--pico-primary-background);
+  color: var(--pico-primary-hover);
 }
 
-.btn-delete {
-  background: none;
-  border: none;
-  color: #dc2626;
-  cursor: pointer;
-  padding: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.btn-delete:hover {
-  text-decoration: underline;
+.toast {
+  padding: 12px 20px;
+  border-radius: var(--pico-border-radius);
+  font-size: 0.85rem;
+  border: 1px solid var(--pico-border-color);
+  background-color: var(--pico-card-background-color);
+  box-shadow: var(--pico-card-box-shadow);
 }
 
-main {
-  flex: 1;
-  padding: 30px;
-  overflow-y: auto;
-  box-sizing: border-box;
+.toast.success {
+  border-color: var(--pico-form-element-valid-border-color);
+  color: var(--pico-form-element-valid-active-border-color);
+}
+
+.toast.error {
+  border-color: var(--pico-form-element-invalid-border-color);
+  color: var(--pico-form-element-invalid-active-border-color);
 }
 
 .welcome-container {
@@ -142,190 +153,4 @@ main {
   justify-content: center;
   align-items: center;
   height: 100%;
-}
-
-.welcome-card {
-  text-align: center;
-  max-width: 450px;
-}
-
-.welcome-card h2 {
-  font-size: 1.75rem;
-  margin-bottom: 12px;
-}
-
-.welcome-card p {
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.editor-container {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 800px;
-  width: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  box-sizing: border-box;
-}
-
-.editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 12px;
-}
-
-.editor-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.read-only-alert {
-  background-color: #fef3c7;
-  border: 1px solid #fde68a;
-  padding: 10px 14px;
-  border-radius: 6px;
-  color: #92400e;
-  font-size: 0.8rem;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #475569;
-}
-
-input[type="text"], textarea {
-  border: 1px solid #cbd5e1;
-  padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  outline: none;
-}
-
-input[type="text"]:focus, textarea:focus {
-  border-color: #2563eb;
-}
-
-textarea {
-  resize: vertical;
-  min-height: 120px;
-}
-
-.toggle-row {
-  display: flex;
-  gap: 30px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.toggle-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.tool-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 16px;
-}
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  border: none;
-}
-
-.btn-secondary {
-  background-color: #e2e8f0;
-  color: #334155;
-}
-
-.btn-secondary:hover {
-  background-color: #cbd5e1;
-}
-
-.btn-save {
-  background-color: #2563eb;
-  color: white;
-}
-
-.btn-save:hover {
-  background-color: #1d4ed8;
-}
-
-.toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 1000;
-}
-
-.toast {
-  padding: 12px 20px;
-  border-radius: 6px;
-  color: #0f172a;
-  font-weight: 550;
-  font-size: 0.85rem;
-  border: 1px solid transparent;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.toast.success {
-  background-color: #d1fae5;
-  border-color: #a7f3d0;
-}
-
-.toast.error {
-  background-color: #fee2e2;
-  border-color: #fca5a5;
 }
