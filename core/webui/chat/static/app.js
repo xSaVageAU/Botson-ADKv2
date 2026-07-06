@@ -1,6 +1,7 @@
 const API_BASE = 'http://localhost:8080/api';
 let activeAgent = null;
 let activeSessionId = null;
+let isNewSession = false;
 let activeTab = 'state';
 
 // Initial bootstrap
@@ -122,6 +123,7 @@ async function loadSessions() {
 // Select session
 async function selectSession(sessionId) {
   activeSessionId = sessionId;
+  isNewSession = false;
   
   // Highlight active session row in list
   document.querySelectorAll('.session-row').forEach(row => {
@@ -208,22 +210,36 @@ async function deleteSession(event, sessionId) {
 async function startNewSession() {
   if (!activeAgent) return;
 
-  try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: {}, events: [] })
-    });
+  activeSessionId = crypto.randomUUID();
+  isNewSession = true;
 
-    if (!res.ok) throw new Error('Failed to create session');
-    const sessionData = await res.json(); // Session object
+  document.getElementById('sessionPill').textContent = activeSessionId;
+  document.getElementById('sessionPill').className = 'pill pill-accent';
+  document.getElementById('activeAgentName').textContent = 'New Chat';
+  document.getElementById('activeAgentSub').textContent = `SESSION: ${activeAgent}`;
 
-    activeSessionId = sessionData.id;
-    await loadSessions();
-    await selectSession(activeSessionId);
-  } catch (err) {
-    showToast(`Session Error: ${err.message}`, 'error');
-  }
+  clearChatLog();
+  clearInspector();
+
+  // Highlight new session locally in sidebar
+  const listEl = document.getElementById('sessionList');
+  const emptyItem = listEl.querySelector('.empty-state') || listEl.querySelector('li[style*="italic"]');
+  if (emptyItem) emptyItem.remove();
+
+  document.querySelectorAll('.session-row').forEach(row => row.classList.remove('active'));
+
+  const li = document.createElement('li');
+  li.className = 'session-row active';
+  li.dataset.id = activeSessionId;
+  li.onclick = () => selectSession(activeSessionId);
+  li.innerHTML = `
+    <div class="session-info">
+      <span class="session-id-text" title="${escapeHtml(activeSessionId)}">New Chat</span>
+      <span class="session-time-text">just now</span>
+    </div>
+    <button class="btn-delete-session" onclick="deleteSession(event, '${activeSessionId}')" title="Delete session">🗑</button>
+  `;
+  listEl.insertBefore(li, listEl.firstChild);
 }
 
 // Keydown handler
@@ -256,13 +272,27 @@ async function sendMessage() {
     }
   };
 
-  const isFirstMessage = document.querySelectorAll('.message-row.user').length === 1;
-  if (isFirstMessage) {
-    payload.stateDelta = {
-      "__session_metadata__": {
-        "displayName": text
-      }
-    };
+  if (isNewSession) {
+    try {
+      const createRes = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${activeSessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: {
+            "__session_metadata__": {
+              "displayName": text
+            }
+          },
+          events: []
+        })
+      });
+      if (!createRes.ok) throw new Error('Failed to initialize session on backend');
+      isNewSession = false;
+    } catch (err) {
+      indicator.classList.remove('active');
+      showToast(`Failed to initialize session: ${err.message}`, 'error');
+      return;
+    }
   }
 
   try {
