@@ -316,100 +316,110 @@
         <div class="settings-container">
           <form id="settingsForm" onsubmit="window.saveSettings(event)">
             
-            <div class="settings-card">
-              <h3 class="settings-card-title">LLM Credentials</h3>
-              <div class="form-group">
-                <label for="geminiApiKeyInput">Gemini API Key</label>
-                <div class="password-input-wrapper">
-                  <input type="password" id="geminiApiKeyInput" placeholder="Enter Gemini API key...">
-                  <button type="button" class="reveal-btn" onclick="window.togglePasswordVisibility('geminiApiKeyInput')">👁️</button>
-                </div>
-                <small class="form-help">Your API key is stored securely in your local user directory.</small>
-              </div>
-            </div>
-
-            <div class="settings-card">
-              <div class="card-header-toggle">
-                <h3 class="settings-card-title">Discord Bot Gateway</h3>
-                <label class="switch">
-                  <input type="checkbox" id="discordEnabledInput" onchange="window.toggleDiscordFields(this.checked)">
-                  <span class="slider round"></span>
-                </label>
-              </div>
-
-              <div id="discordFieldsContainer" class="disabled-fields">
-                <div class="form-group">
-                  <label for="discordTokenInput">Discord Bot Token</label>
-                  <div class="password-input-wrapper">
-                    <input type="password" id="discordTokenInput" placeholder="Enter Discord bot token...">
-                    <button type="button" class="reveal-btn" onclick="window.togglePasswordVisibility('discordTokenInput')">👁️</button>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="discordOwnerIdInput">Owner User ID</label>
-                  <input type="text" id="discordOwnerIdInput" placeholder="Discord User ID of the supreme bot administrator">
-                </div>
-
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label for="discordGuildIdInput">Test Guild ID (Server ID)</label>
-                    <input type="text" id="discordGuildIdInput" placeholder="Optional: instant slash commands propagation">
-                  </div>
-
-                  <div class="form-group">
-                    <label for="discordLogChannelIdInput">Log Channel ID</label>
-                    <input type="text" id="discordLogChannelIdInput" placeholder="Optional: online/offline announcements">
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Discord Access Control Card -->
-            <div class="settings-card" id="discordAccessControlCard">
-              <h3 class="settings-card-title">Discord Access Control</h3>
+            <div class="settings-grid">
               
-              <!-- Pending Approvals Section -->
-              <div class="access-section">
-                <span class="access-section-title">Pending Authorization Requests</span>
-                <div class="table-container">
-                  <table id="pendingAuthsTable">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>User ID</th>
-                        <th>Auth Code</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="pendingAuthsBody">
-                      <tr>
-                        <td colspan="4" class="empty-table-state">No pending authorization requests.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              <!-- Left Column: Credentials -->
+              <div class="settings-column">
+                <div class="settings-card">
+                  <h3 class="settings-card-title">LLM Credentials</h3>
+                  <div class="form-group">
+                    <label for="geminiApiKeyInput">Gemini API Key</label>
+                    <div class="password-input-wrapper">
+                      <input type="password" id="geminiApiKeyInput" placeholder="Enter Gemini API key...">
+                      <button type="button" class="reveal-btn" onclick="window.togglePasswordVisibility('geminiApiKeyInput')">👁️</button>
+                    </div>
+                    <small class="form-help">Your API key is stored securely in your local user directory.</small>
+                  </div>
+                </div>
+
+                <div class="settings-card">
+                  <div class="card-header-toggle">
+                    <h3 class="settings-card-title">Discord Bot Gateway</h3>
+                    <label class="switch">
+                      <input type="checkbox" id="discordEnabledInput" onchange="window.toggleDiscordFields(this.checked)">
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+
+                  <div id="discordFieldsContainer" class="disabled-fields">
+                    <div class="form-group">
+                      <label for="discordTokenInput">Discord Bot Token</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="discordTokenInput" placeholder="Enter Discord bot token...">
+                        <button type="button" class="reveal-btn" onclick="window.togglePasswordVisibility('discordTokenInput')">👁️</button>
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="discordOwnerIdInput">Owner User ID</label>
+                      <input type="text" id="discordOwnerIdInput" placeholder="Discord User ID of the supreme bot administrator">
+                    </div>
+
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label for="discordGuildIdInput">Test Guild ID (Server ID)</label>
+                        <input type="text" id="discordGuildIdInput" placeholder="Optional: instant slash commands propagation">
+                      </div>
+
+                      <div class="form-group">
+                        <label for="discordLogChannelIdInput">Log Channel ID</label>
+                        <input type="text" id="discordLogChannelIdInput" placeholder="Optional: online/offline announcements">
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Active Whitelist Section -->
-              <div class="access-section" style="margin-top: 16px;">
-                <span class="access-section-title">Active Whitelisted Users</span>
-                <div class="table-container">
-                  <table id="activeWhitelistTable">
-                    <thead>
-                      <tr>
-                        <th>User ID</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="activeWhitelistBody">
-                      <tr>
-                        <td colspan="2" class="empty-table-state">No users whitelisted yet.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              <!-- Right Column: Access Control -->
+              <div class="settings-column">
+                <!-- Discord Access Control Card -->
+                <div class="settings-card" id="discordAccessControlCard">
+                  <h3 class="settings-card-title">Discord Access Control</h3>
+                  
+                  <!-- Pending Approvals Section -->
+                  <div class="access-section">
+                    <span class="access-section-title">Pending Authorization Requests</span>
+                    <div class="table-container">
+                      <table id="pendingAuthsTable">
+                        <thead>
+                          <tr>
+                            <th>Username</th>
+                            <th>User ID</th>
+                            <th>Auth Code</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody id="pendingAuthsBody">
+                          <tr>
+                            <td colspan="4" class="empty-table-state">No pending authorization requests.</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Active Whitelist Section -->
+                  <div class="access-section" style="margin-top: 16px;">
+                    <span class="access-section-title">Active Whitelisted Users</span>
+                    <div class="table-container">
+                      <table id="activeWhitelistTable">
+                        <thead>
+                          <tr>
+                            <th>User ID</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody id="activeWhitelistBody">
+                          <tr>
+                            <td colspan="2" class="empty-table-state">No users whitelisted yet.</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
+
             </div>
 
             <div class="form-actions">
