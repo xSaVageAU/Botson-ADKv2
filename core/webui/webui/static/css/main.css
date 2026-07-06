@@ -582,6 +582,12 @@ html, body {
   color: var(--text-faint);
 }
 
+#discordFieldsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .disabled-fields {
   opacity: 0.35;
   pointer-events: none;
