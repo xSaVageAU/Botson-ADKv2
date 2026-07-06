@@ -67,7 +67,7 @@ window.loadSessions = async function() {
   listEl.innerHTML = '<li style="padding: 10px; font-size: 12px; color: var(--text-faint);">Loading sessions...</li>';
 
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions`);
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions`);
     if (!res.ok) throw new Error('Failed to load sessions');
     const sessions = await res.json();
 
@@ -136,7 +136,7 @@ window.selectSession = async function(sessionId) {
   window.clearInspector();
 
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${sessionId}`);
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${sessionId}`);
     if (!res.ok) throw new Error('Failed to load session details');
     const sessionData = await res.json();
 
@@ -215,7 +215,7 @@ window.deleteSession = async function(event, sessionId) {
   if (!confirm(`Are you sure you want to delete session "${sessionId}"?`)) return;
 
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${sessionId}`, {
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${sessionId}`, {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to delete session');
@@ -257,7 +257,7 @@ window.sendMessage = async function() {
 
   const payload = {
     appName: window.activeAgent,
-    userId: 'user',
+    userId: window.currentUser,
     sessionId: window.activeSessionId,
     newMessage: {
       role: 'user',
@@ -267,7 +267,7 @@ window.sendMessage = async function() {
 
   if (window.isNewSession) {
     try {
-      const createRes = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${window.activeSessionId}`, {
+      const createRes = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${window.activeSessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -358,7 +358,7 @@ window.sendMessage = async function() {
 
 window.fetchSessionState = async function() {
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${window.activeSessionId}`);
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${window.activeSessionId}`);
     if (res.ok) {
       const sessionData = await res.json();
       window.updateStateInspector(sessionData.state);
@@ -386,7 +386,7 @@ window.loadArtifacts = async function() {
   listEl.innerHTML = '<li style="padding: 10px; font-size: 11px; color: var(--text-faint);">Loading artifacts...</li>';
 
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${window.activeSessionId}/artifacts`);
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${window.activeSessionId}/artifacts`);
     if (!res.ok) throw new Error('Failed to load artifacts');
     const filenames = await res.json();
 
@@ -420,7 +420,7 @@ window.viewArtifact = async function(artifactName) {
   codeEl.textContent = '';
 
   try {
-    const res = await fetch(`/api/apps/${window.activeAgent}/users/user/sessions/${window.activeSessionId}/artifacts/${artifactName}`);
+    const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions/${window.activeSessionId}/artifacts/${artifactName}`);
     if (!res.ok) throw new Error('Failed to load content');
     const part = await res.json();
 

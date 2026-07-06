@@ -78,7 +78,7 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 			sessionCount := 0
 			listResponse, err := configLauncher.SessionService.List(ctx, &session.ListRequest{
 				AppName: name,
-				UserID:  "user",
+				UserID:  "",
 			})
 			if err == nil && listResponse != nil {
 				sessionCount = len(listResponse.Sessions)
@@ -141,5 +141,41 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 		}
 
 		controllers.EncodeJSONResponse(dashboardResponse, http.StatusOK, w)
+	})
+
+	// GET /botson/api/users - returns list of all unique user IDs across all sessions
+	r.Methods("GET").Path("/users").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if configLauncher == nil || configLauncher.SessionService == nil {
+			controllers.EncodeJSONResponse([]string{"user"}, http.StatusOK, w)
+			return
+		}
+		
+		ctx := r.Context()
+		agentNames := configLauncher.AgentLoader.ListAgents()
+		
+		userMap := make(map[string]bool)
+		// Default UI context
+		userMap["user"] = true
+
+		for _, name := range agentNames {
+			listResponse, err := configLauncher.SessionService.List(ctx, &session.ListRequest{
+				AppName: name,
+			})
+			if err == nil && listResponse != nil {
+				for _, s := range listResponse.Sessions {
+					if s.UserID() != "" {
+						userMap[s.UserID()] = true
+					}
+				}
+			}
+		}
+
+		var users []string
+		for u := range userMap {
+			users = append(users, u)
+		}
+		sort.Strings(users)
+
+		controllers.EncodeJSONResponse(users, http.StatusOK, w)
 	})
 }

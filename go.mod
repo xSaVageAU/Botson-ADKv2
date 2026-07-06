@@ -16,6 +16,7 @@ require (
 	github.com/a2aproject/a2a-go v0.3.15 // indirect
 	github.com/a2aproject/a2a-go/v2 v2.3.1 // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
+	github.com/bwmarrin/discordgo v0.29.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

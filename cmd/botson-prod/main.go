@@ -6,6 +6,7 @@ import (
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
 	"botsonv2/core/webui"
+	"botsonv2/core/gateways/discord"
 	"context"
 	"flag"
 	"fmt"
@@ -31,6 +32,7 @@ func main() {
 	// Define standard flags directly to drop positional ADK parameters
 	portFlag := flag.Int("port", 8080, "Port to run the unified server on")
 	otelFlag := flag.Bool("otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
+	discordFlag := flag.Bool("discord", false, "Start the background Discord Gateway alongside the WebUI server")
 	flag.Parse()
 
 	// Load Configuration
@@ -102,6 +104,33 @@ func main() {
 			webui.NewSublauncher(),
 		),
 	)
+
+	// Start Background Discord Gateway if flagged
+	if *discordFlag {
+		token := os.Getenv("DISCORD_TOKEN")
+		if token == "" {
+			log.Println("Discord Warning: -discord flag was set but DISCORD_TOKEN environment variable is missing. Gateway disabled.")
+		} else {
+			gateway, err := discord.New(token, configLauncher)
+			if err != nil {
+				log.Printf("Discord Error: failed to initialize gateway: %v", err)
+			} else {
+				log.Println("Starting background Discord Gateway...")
+				if err := gateway.Start(); err != nil {
+					log.Printf("Discord Error: failed to start gateway: %v", err)
+				} else {
+					log.Println("Discord Gateway is online in the background.")
+					go func() {
+						<-ctx.Done()
+						log.Println("Shutting down background Discord Gateway...")
+						if err := gateway.Close(); err != nil {
+							log.Printf("Discord Error: failed to close gateway: %v", err)
+						}
+					}()
+				}
+			}
+		}
+	}
 
 	// Execute the Unified REST & UI Web server
 	fmt.Printf("Starting production server on http://localhost:%d... please do not close this window.\n", *portFlag)

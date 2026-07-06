@@ -41,6 +41,17 @@
         </button>
       </div>
 
+      <!-- User Switcher -->
+      <div class="user-switcher-section">
+        <span class="switcher-label">Active User Context</span>
+        <div class="switcher-dropdown-wrapper">
+          <span class="switcher-icon">👤</span>
+          <select id="userSelect" onchange="changeCurrentUser(this.value)">
+            <option value="user">user</option>
+          </select>
+        </div>
+      </div>
+
       <div class="sidebar-foot">
         <span class="status-dot green"></span>
         <span class="status-text">Production</span>
