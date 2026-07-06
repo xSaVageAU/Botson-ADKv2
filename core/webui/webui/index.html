@@ -311,6 +311,7 @@
             <span class="eyebrow">workspace settings</span>
             <h2>Configuration Control</h2>
           </div>
+          <button type="submit" form="settingsForm" class="submit-btn">Save Configurations</button>
         </header>
 
         <div class="settings-container">
@@ -379,42 +380,16 @@
                   <!-- Pending Approvals Section -->
                   <div class="access-section">
                     <span class="access-section-title">Pending Authorization Requests</span>
-                    <div class="table-container">
-                      <table id="pendingAuthsTable">
-                        <thead>
-                          <tr>
-                            <th>Username</th>
-                            <th>User ID</th>
-                            <th>Auth Code</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="pendingAuthsBody">
-                          <tr>
-                            <td colspan="4" class="empty-table-state">No pending authorization requests.</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div class="access-list" id="pendingAuthsList">
+                      <div class="empty-table-state">No pending authorization requests.</div>
                     </div>
                   </div>
 
                   <!-- Active Whitelist Section -->
-                  <div class="access-section" style="margin-top: 16px;">
+                  <div class="access-section" style="margin-top: 20px;">
                     <span class="access-section-title">Active Whitelisted Users</span>
-                    <div class="table-container">
-                      <table id="activeWhitelistTable">
-                        <thead>
-                          <tr>
-                            <th>User ID</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody id="activeWhitelistBody">
-                          <tr>
-                            <td colspan="2" class="empty-table-state">No users whitelisted yet.</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div class="access-list" id="activeWhitelistList">
+                      <div class="empty-table-state">No users whitelisted yet.</div>
                     </div>
                   </div>
                 </div>
@@ -422,11 +397,8 @@
 
             </div>
 
-            <div class="form-actions">
-              <button type="submit" class="submit-btn">Save Configurations</button>
-            </div>
-
           </form>
+        </div>
         </div>
       </main>
 

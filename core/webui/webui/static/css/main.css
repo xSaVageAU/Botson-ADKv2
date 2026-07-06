@@ -689,12 +689,73 @@ html, body {
   padding-left: 8px;
 }
 
+.access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.access-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  gap: 12px;
+  transition: background 0.15s;
+}
+
+.access-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-info .username {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-info .userid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.auth-code-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-light);
+  white-space: nowrap;
+}
+
 .empty-table-state {
-  text-align: center !important;
-  padding: 20px !important;
-  color: var(--text-faint) !important;
+  text-align: center;
+  padding: 24px;
+  color: var(--text-faint);
   font-size: 13px;
   font-style: italic;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .btn-action-approve {
@@ -702,7 +763,7 @@ html, body {
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 5px 12px;
+  padding: 5px 14px;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;
@@ -722,7 +783,7 @@ html, body {
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 5px 12px;
+  padding: 5px 14px;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;

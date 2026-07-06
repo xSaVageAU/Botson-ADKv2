@@ -187,22 +187,21 @@ window.loadSettings = async function() {
 };
 
 window.renderAccessControl = async function(whitelist) {
-  // 1. Render Active Whitelist Table
-  const wlBody = document.getElementById('activeWhitelistBody');
-  if (wlBody) {
-    wlBody.innerHTML = '';
+  // 1. Render Active Whitelist List
+  const wlList = document.getElementById('activeWhitelistList');
+  if (wlList) {
+    wlList.innerHTML = '';
     if (!whitelist || whitelist.length === 0) {
-      wlBody.innerHTML = `<tr><td colspan="2" class="empty-table-state">No users whitelisted yet.</td></tr>`;
+      wlList.innerHTML = `<div class="empty-table-state">No users whitelisted yet.</div>`;
     } else {
       whitelist.forEach(uid => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td style="font-family: var(--font-mono); font-size: 13px; color: var(--text);">${window.escapeHtml(uid)}</td>
-          <td>
-            <button type="button" class="btn-action-revoke" onclick="window.revokeUserAccess('${uid}')">Revoke Access</button>
-          </td>
+        const div = document.createElement('div');
+        div.className = 'access-item';
+        div.innerHTML = `
+          <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text);">${window.escapeHtml(uid)}</span>
+          <button type="button" class="btn-action-revoke" onclick="window.revokeUserAccess('${uid}')">Revoke Access</button>
         `;
-        wlBody.appendChild(tr);
+        wlList.appendChild(div);
       });
     }
   }
@@ -226,23 +225,24 @@ window.renderAccessControl = async function(whitelist) {
     if (!res.ok) throw new Error('Failed to fetch pending requests');
     const pending = await res.json();
     
-    const pendBody = document.getElementById('pendingAuthsBody');
-    if (pendBody) {
-      pendBody.innerHTML = '';
+    const pendList = document.getElementById('pendingAuthsList');
+    if (pendList) {
+      pendList.innerHTML = '';
       if (!pending || pending.length === 0) {
-        pendBody.innerHTML = `<tr><td colspan="4" class="empty-table-state">No pending authorization requests.</td></tr>`;
+        pendList.innerHTML = `<div class="empty-table-state">No pending authorization requests.</div>`;
       } else {
         pending.forEach(req => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td style="font-weight: 500;">${window.escapeHtml(req.username)}</td>
-            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">${window.escapeHtml(req.user_id)}</td>
-            <td style="font-family: var(--font-mono); font-weight: 600; color: var(--accent);">${window.escapeHtml(req.code)}</td>
-            <td>
-              <button type="button" class="btn-action-approve" onclick="window.approveUserAccess('${req.code}')">Approve</button>
-            </td>
+          const div = document.createElement('div');
+          div.className = 'access-item';
+          div.innerHTML = `
+            <div class="user-info">
+              <span class="username">${window.escapeHtml(req.username)}</span>
+              <span class="userid">${window.escapeHtml(req.user_id)}</span>
+            </div>
+            <span class="auth-code-badge">${window.escapeHtml(req.code)}</span>
+            <button type="button" class="btn-action-approve" onclick="window.approveUserAccess('${req.code}')">Approve</button>
           `;
-          pendBody.appendChild(tr);
+          pendList.appendChild(div);
         });
       }
     }
