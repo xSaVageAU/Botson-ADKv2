@@ -70,7 +70,7 @@ async function loadSessions() {
   listEl.innerHTML = '<li style="padding: 10px; font-size: 12px; color: var(--text-faint);">Loading sessions...</li>';
 
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions`);
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions`);
     if (!res.ok) throw new Error('Failed to load sessions');
     const sessions = await res.json(); // Array of Session objects
 
@@ -130,7 +130,7 @@ async function selectSession(sessionId) {
   clearInspector();
 
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${sessionId}`);
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${sessionId}`);
     if (!res.ok) throw new Error('Failed to load session details');
     const sessionData = await res.json();
 
@@ -170,7 +170,7 @@ async function deleteSession(event, sessionId) {
   if (!confirm(`Are you sure you want to delete session "${sessionId}"?`)) return;
 
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${sessionId}`, {
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${sessionId}`, {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to delete session');
@@ -199,7 +199,7 @@ async function startNewSession() {
   const sessionId = 'session-' + Math.random().toString(36).substring(2, 10);
   
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${sessionId}`, {
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${sessionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: {}, events: [] })
@@ -238,7 +238,7 @@ async function sendMessage() {
 
   const payload = {
     appName: activeAgent,
-    userId: 'default',
+    userId: 'user',
     sessionId: activeSessionId,
     newMessage: {
       role: 'user',
@@ -319,7 +319,7 @@ async function sendMessage() {
 // Fetch session state from DB
 async function fetchSessionState() {
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${activeSessionId}`);
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${activeSessionId}`);
     if (res.ok) {
       const sessionData = await res.json();
       updateStateInspector(sessionData.state);
@@ -347,7 +347,7 @@ async function loadArtifacts() {
   listEl.innerHTML = '<li style="padding: 10px; font-size: 11px; color: var(--text-faint);">Loading artifacts...</li>';
 
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${activeSessionId}/artifacts`);
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${activeSessionId}/artifacts`);
     if (!res.ok) throw new Error('Failed to load artifacts list');
     const filenames = await res.json(); // string array
 
@@ -382,7 +382,7 @@ async function viewArtifact(artifactName) {
   codeEl.textContent = '';
 
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/default/sessions/${activeSessionId}/artifacts/${artifactName}`);
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${activeSessionId}/artifacts/${artifactName}`);
     if (!res.ok) throw new Error('Failed to load artifact content');
     const part = await res.json(); // genai.Part object (containing text representation)
 
