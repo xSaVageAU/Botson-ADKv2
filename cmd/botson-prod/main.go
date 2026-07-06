@@ -115,12 +115,14 @@ func main() {
 		if token == "" {
 			log.Println("Discord Warning: Discord integration is enabled, but Token is empty in config.json. Gateway disabled.")
 		} else {
-			log.Println("Starting background Discord Gateway via manager...")
-			if err := mgr.Start(token, appConfig.Discord.GuildID, appConfig.Discord.LogChannelID); err != nil {
-				log.Printf("Discord Error: failed to start gateway: %v\n", err)
-			} else {
-				log.Println("Discord Gateway is online in the background.")
-			}
+			log.Println("Starting background Discord Gateway via manager in background...")
+			go func() {
+				if err := mgr.Start(token, appConfig.Discord.GuildID, appConfig.Discord.LogChannelID); err != nil {
+					log.Printf("Discord Error: failed to start gateway: %v\n", err)
+				} else {
+					log.Println("Discord Gateway is online in the background.")
+				}
+			}()
 		}
 	}
 
