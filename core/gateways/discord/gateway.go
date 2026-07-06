@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -96,11 +97,66 @@ func (g *Gateway) Start() error {
 		}
 	}
 
+	// Send Boot DM to owner if configured
+	cfg, err := config.Load()
+	if err == nil && cfg.Discord.OwnerID != "" {
+		hostOS := runtime.GOOS
+		rootAgentName := "None"
+		if rootAgent := g.config.AgentLoader.RootAgent(); rootAgent != nil {
+			rootAgentName = rootAgent.Name()
+		}
+
+		embed := &discordgo.MessageEmbed{
+			Title:       "🟢 Botson Gateway Online",
+			Color:       0x10B981,
+			Description: "Your Botson Workspace Console gateway is active and listening for messages.",
+			Fields: []*discordgo.MessageEmbedField{
+				{Name: "Host System", Value: fmt.Sprintf("`%s`", hostOS), Inline: true},
+				{Name: "Default Agent", Value: fmt.Sprintf("`%s`", rootAgentName), Inline: true},
+			},
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+		g.sendOwnerNotification(embed)
+	}
+
 	return nil
 }
 
 func (g *Gateway) Close() error {
+	// Send Shutdown DM to owner if configured
+	cfg, err := config.Load()
+	if err == nil && cfg.Discord.OwnerID != "" {
+		embed := &discordgo.MessageEmbed{
+			Title:       "🔴 Botson Gateway Offline",
+			Color:       0xEF4444,
+			Description: "Your Botson Workspace Console gateway is shutting down gracefully.",
+			Fields: []*discordgo.MessageEmbedField{
+				{Name: "Exit Status", Value: "`Clean Shutdown`", Inline: false},
+			},
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+		g.sendOwnerNotification(embed)
+	}
+
 	return g.session.Close()
+}
+
+func (g *Gateway) sendOwnerNotification(embed *discordgo.MessageEmbed) {
+	cfg, err := config.Load()
+	if err != nil || cfg.Discord.OwnerID == "" {
+		return
+	}
+
+	dm, err := g.session.UserChannelCreate(cfg.Discord.OwnerID)
+	if err != nil {
+		log.Printf("Discord Warning: failed to create DM channel with owner: %v", err)
+		return
+	}
+
+	_, err = g.session.ChannelMessageSendEmbed(dm.ID, embed)
+	if err != nil {
+		log.Printf("Discord Warning: failed to send DM embed to owner: %v", err)
+	}
 }
 
 func (g *Gateway) isAuthorized(userID string, member *discordgo.Member) bool {
