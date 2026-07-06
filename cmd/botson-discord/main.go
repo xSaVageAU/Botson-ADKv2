@@ -33,13 +33,7 @@ func main() {
 		log.Fatal("Configuration error: discord.token is not defined in ~/.botsonv2/config.json.")
 	}
 
-	// Set environment variables for the gateway settings from config.json
-	if appConfig.Discord.GuildID != "" {
-		os.Setenv("DISCORD_GUILD_ID", appConfig.Discord.GuildID)
-	}
-	if appConfig.Discord.LogChannelID != "" {
-		os.Setenv("DISCORD_LOG_CHANNEL_ID", appConfig.Discord.LogChannelID)
-	}
+
 
 	// Initialize Gemini model
 	model, err := gemini.NewModel(ctx, appConfig.ModelName, &genai.ClientConfig{

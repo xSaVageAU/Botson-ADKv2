@@ -235,7 +235,7 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 		mgr := discord.GetManager()
 		if mgr != nil {
 			go func() {
-				err := mgr.Restart(req.Discord.Enabled, req.Discord.Token, req.Discord.GuildID, req.Discord.LogChannelID)
+				err := mgr.Restart(req.Discord.Enabled, req.Discord.Token)
 				if err != nil {
 					log.Printf("Dynamic Discord restart error: %v\n", err)
 				}

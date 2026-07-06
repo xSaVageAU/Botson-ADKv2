@@ -117,7 +117,7 @@ func main() {
 		} else {
 			log.Println("Starting background Discord Gateway via manager in background...")
 			go func() {
-				if err := mgr.Start(token, appConfig.Discord.GuildID, appConfig.Discord.LogChannelID); err != nil {
+				if err := mgr.Start(token); err != nil {
 					log.Printf("Discord Error: failed to start gateway: %v\n", err)
 				} else {
 					log.Println("Discord Gateway is online in the background.")

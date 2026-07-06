@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"sync"
 	"time"
 
@@ -48,24 +47,12 @@ func GetManager() *Manager {
 }
 
 // Start starts the gateway with the given token if it is not already running.
-func (m *Manager) Start(token string, guildID, logChannelID string) error {
+func (m *Manager) Start(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.gateway != nil {
 		return nil // Already running
-	}
-
-	// Set temporary environment overrides so gateway startup picks them up correctly
-	if guildID != "" {
-		os.Setenv("DISCORD_GUILD_ID", guildID)
-	} else {
-		os.Unsetenv("DISCORD_GUILD_ID")
-	}
-	if logChannelID != "" {
-		os.Setenv("DISCORD_LOG_CHANNEL_ID", logChannelID)
-	} else {
-		os.Unsetenv("DISCORD_LOG_CHANNEL_ID")
 	}
 
 	gw, err := New(token, m.config)
@@ -105,11 +92,11 @@ func (m *Manager) IsRunning() bool {
 }
 
 // Restart applies config updates dynamically by stopping and starting the bot.
-func (m *Manager) Restart(enabled bool, token, guildID, logChannelID string) error {
+func (m *Manager) Restart(enabled bool, token string) error {
 	_ = m.Stop()
 
 	if enabled && token != "" {
-		return m.Start(token, guildID, logChannelID)
+		return m.Start(token)
 	}
 	return nil
 }

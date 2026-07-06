@@ -206,8 +206,6 @@ window.loadSettings = async function() {
     document.getElementById('discordEnabledInput').checked = !!(cfg.discord && cfg.discord.enabled);
     document.getElementById('discordTokenInput').value = (cfg.discord && cfg.discord.token) || '';
     document.getElementById('discordOwnerIdInput').value = (cfg.discord && cfg.discord.owner_id) || '';
-    document.getElementById('discordGuildIdInput').value = (cfg.discord && cfg.discord.guild_id) || '';
-    document.getElementById('discordLogChannelIdInput').value = (cfg.discord && cfg.discord.log_channel_id) || '';
     
     // Save whitelist locally to preserve on settings save
     window.currentWhitelist = (cfg.discord && cfg.discord.whitelist) || [];
@@ -336,8 +334,6 @@ window.saveSettings = async function(event) {
       enabled: document.getElementById('discordEnabledInput').checked,
       token: document.getElementById('discordTokenInput').value.trim(),
       owner_id: document.getElementById('discordOwnerIdInput').value.trim(),
-      guild_id: document.getElementById('discordGuildIdInput').value.trim(),
-      log_channel_id: document.getElementById('discordLogChannelIdInput').value.trim(),
       whitelist: window.currentWhitelist || []
     }
   };

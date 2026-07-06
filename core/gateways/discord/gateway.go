@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -91,53 +89,17 @@ func (g *Gateway) Start() error {
 		},
 	}
 
-	guildID := os.Getenv("DISCORD_GUILD_ID")
 	for _, cmd := range commands {
-		_, err := g.session.ApplicationCommandCreate(g.session.State.User.ID, guildID, cmd)
+		_, err := g.session.ApplicationCommandCreate(g.session.State.User.ID, "", cmd)
 		if err != nil {
 			log.Printf("Cannot create application command %q: %v", cmd.Name, err)
 		}
-	}
-
-	// Send Boot Announcement if Log Channel ID is configured
-	if logChanID := os.Getenv("DISCORD_LOG_CHANNEL_ID"); logChanID != "" {
-		hostOS := runtime.GOOS
-		rootAgentName := "None"
-		if rootAgent := g.config.AgentLoader.RootAgent(); rootAgent != nil {
-			rootAgentName = rootAgent.Name()
-		}
-
-		embed := &discordgo.MessageEmbed{
-			Title:       "🟢 Botson Gateway Online",
-			Color:       0x10B981,
-			Description: "Botson Workspace Console gateway is active and listening for messages.",
-			Fields: []*discordgo.MessageEmbedField{
-				{Name: "Host System", Value: fmt.Sprintf("`%s`", hostOS), Inline: true},
-				{Name: "Active Agent", Value: fmt.Sprintf("`%s`", rootAgentName), Inline: true},
-			},
-			Timestamp: time.Now().Format(time.RFC3339),
-		}
-		g.session.ChannelMessageSendEmbed(logChanID, embed)
 	}
 
 	return nil
 }
 
 func (g *Gateway) Close() error {
-	// Send Shutdown Announcement
-	if logChanID := os.Getenv("DISCORD_LOG_CHANNEL_ID"); logChanID != "" {
-		embed := &discordgo.MessageEmbed{
-			Title:       "🔴 Botson Gateway Offline",
-			Color:       0xEF4444,
-			Description: "Botson Workspace Console gateway is shutting down gracefully.",
-			Fields: []*discordgo.MessageEmbedField{
-				{Name: "Exit Status", Value: "`Clean Shutdown`", Inline: false},
-			},
-			Timestamp: time.Now().Format(time.RFC3339),
-		}
-		g.session.ChannelMessageSendEmbed(logChanID, embed)
-	}
-
 	return g.session.Close()
 }
 

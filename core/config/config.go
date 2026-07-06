@@ -16,12 +16,10 @@ type AppConfig struct {
 
 // DiscordConfig holds parameters for the Discord gateway integration.
 type DiscordConfig struct {
-	Enabled      bool     `json:"enabled"`
-	Token        string   `json:"token"`
-	GuildID      string   `json:"guild_id"`
-	LogChannelID string   `json:"log_channel_id"`
-	OwnerID      string   `json:"owner_id"`
-	Whitelist    []string `json:"whitelist"`
+	Enabled   bool     `json:"enabled"`
+	Token     string   `json:"token"`
+	OwnerID   string   `json:"owner_id"`
+	Whitelist []string `json:"whitelist"`
 }
 
 // GetConfigPath returns the absolute path to ~/.botsonv2/config.json
