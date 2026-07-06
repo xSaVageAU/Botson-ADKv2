@@ -201,8 +201,8 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 
 	// 4. Find root agent and compile otherAgents list (filtering out private agents)
 	appConfig, errCfg := config.Load()
-	rootAgentName := "Agent Botson"
-	if errCfg == nil && appConfig.RootAgent != "" {
+	rootAgentName := ""
+	if errCfg == nil {
 		rootAgentName = appConfig.RootAgent
 	}
 
@@ -210,21 +210,25 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 	var otherAgents []adkagent.Agent
 
 	// Look for configured root agent
-	if loaded, ok := built[rootAgentName]; ok {
-		rootAgent = loaded.Agent
+	if rootAgentName != "" {
+		if loaded, ok := built[rootAgentName]; ok {
+			rootAgent = loaded.Agent
+		}
 	}
 
-	// Fallback if not found
+	// Fallback if not found: first non-private agent
 	if rootAgent == nil {
-		for _, loaded := range built {
+		for name, loaded := range built {
 			if !loaded.Private {
 				rootAgent = loaded.Agent
+				rootAgentName = name
 				break
 			}
 		}
 		if rootAgent == nil {
-			for _, loaded := range built {
+			for name, loaded := range built {
 				rootAgent = loaded.Agent
+				rootAgentName = name
 				break
 			}
 		}
@@ -281,9 +285,23 @@ func GetAgentDetails(embeddedFS fs.FS) ([]AgentDetail, error) {
 
 	// 3. Assemble results list
 	appConfig, _ := config.Load()
-	rootAgentName := "Agent Botson"
-	if appConfig != nil && appConfig.RootAgent != "" {
+	rootAgentName := ""
+	if appConfig != nil {
 		rootAgentName = appConfig.RootAgent
+	}
+	if rootAgentName == "" {
+		for name, cfg := range configs {
+			if !cfg.Private {
+				rootAgentName = name
+				break
+			}
+		}
+		if rootAgentName == "" {
+			for name := range configs {
+				rootAgentName = name
+				break
+			}
+		}
 	}
 
 	var details []AgentDetail

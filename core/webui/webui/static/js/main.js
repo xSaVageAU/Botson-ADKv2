@@ -209,6 +209,12 @@ window.loadSettings = async function () {
 
     // Save whitelist locally to preserve on settings save
     window.currentWhitelist = (cfg.discord && cfg.discord.whitelist) || [];
+    window.currentRootAgent = cfg.root_agent || '';
+
+    // Initialize activeAgent to the default configured root agent on first load
+    if (!window.activeAgent && cfg.root_agent) {
+      window.activeAgent = cfg.root_agent;
+    }
 
     window.toggleDiscordFields(!!(cfg.discord && cfg.discord.enabled));
 
@@ -355,7 +361,7 @@ window.saveSettings = async function (event) {
   const payload = {
     model_name: "gemini-3.1-flash-lite", // Retain standard model default
     gemini_api_key: document.getElementById('geminiApiKeyInput').value.trim(),
-    root_agent: document.getElementById('rootAgentSelect') ? document.getElementById('rootAgentSelect').value : "Agent Botson",
+    root_agent: document.getElementById('rootAgentSelect') ? document.getElementById('rootAgentSelect').value : (window.currentRootAgent || ""),
     discord: {
       enabled: document.getElementById('discordEnabledInput').checked,
       token: document.getElementById('discordTokenInput').value.trim(),
