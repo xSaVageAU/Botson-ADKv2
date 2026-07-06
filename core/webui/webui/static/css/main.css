@@ -437,6 +437,11 @@ html, body {
   pointer-events: none;
 }
 
+select option {
+  background-color: var(--panel-raised);
+  color: var(--text);
+}
+
 /* ==================== SETTINGS SCREEN ==================== */
 .settings-container {
   flex: 1;
