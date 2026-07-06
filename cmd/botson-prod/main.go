@@ -105,32 +105,33 @@ func main() {
 		),
 	)
 
-	// Start Background Discord Gateway if flagged
-	if *discordFlag {
-		token := os.Getenv("DISCORD_TOKEN")
+	// Initialize the Discord Gateway manager
+	mgr := discord.InitManager(configLauncher)
+
+	// Start Background Discord Gateway if configured or flagged
+	discordEnabled := appConfig.Discord.Enabled || *discordFlag
+	if discordEnabled {
+		token := appConfig.Discord.Token
 		if token == "" {
-			log.Println("Discord Warning: -discord flag was set but DISCORD_TOKEN environment variable is missing. Gateway disabled.")
+			log.Println("Discord Warning: Discord integration is enabled, but Token is empty in config.json. Gateway disabled.")
 		} else {
-			gateway, err := discord.New(token, configLauncher)
-			if err != nil {
-				log.Printf("Discord Error: failed to initialize gateway: %v", err)
+			log.Println("Starting background Discord Gateway via manager...")
+			if err := mgr.Start(token, appConfig.Discord.GuildID, appConfig.Discord.LogChannelID); err != nil {
+				log.Printf("Discord Error: failed to start gateway: %v\n", err)
 			} else {
-				log.Println("Starting background Discord Gateway...")
-				if err := gateway.Start(); err != nil {
-					log.Printf("Discord Error: failed to start gateway: %v", err)
-				} else {
-					log.Println("Discord Gateway is online in the background.")
-					go func() {
-						<-ctx.Done()
-						log.Println("Shutting down background Discord Gateway...")
-						if err := gateway.Close(); err != nil {
-							log.Printf("Discord Error: failed to close gateway: %v", err)
-						}
-					}()
-				}
+				log.Println("Discord Gateway is online in the background.")
 			}
 		}
 	}
+
+	// Handle graceful shutdown of background bot
+	go func() {
+		<-ctx.Done()
+		if mgr.IsRunning() {
+			log.Println("Shutting down background Discord Gateway...")
+			_ = mgr.Stop()
+		}
+	}()
 
 	// Execute the Unified REST & UI Web server
 	fmt.Printf("Starting production server on http://localhost:%d... please do not close this window.\n", *portFlag)

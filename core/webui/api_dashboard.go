@@ -1,6 +1,8 @@
 package webui
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -8,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"botsonv2/core/config"
+	"botsonv2/core/gateways/discord"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/server/adkrest/controllers"
 	"google.golang.org/adk/v2/session"
@@ -177,5 +180,68 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 		sort.Strings(users)
 
 		controllers.EncodeJSONResponse(users, http.StatusOK, w)
+	})
+
+	// GET /botson/api/config - returns application configuration masked
+	r.Methods("GET").Path("/config").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg, err := config.Load()
+		if err != nil {
+			http.Error(w, "Failed to load config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Clone and mask secrets
+		clientCfg := *cfg
+		if clientCfg.GeminiAPIKey != "" {
+			clientCfg.GeminiAPIKey = "******"
+		}
+		if clientCfg.Discord.Token != "" {
+			clientCfg.Discord.Token = "******"
+		}
+
+		controllers.EncodeJSONResponse(clientCfg, http.StatusOK, w)
+	})
+
+	// POST /botson/api/config - updates application configuration
+	r.Methods("POST").Path("/config").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req config.AppConfig
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Load current configuration from disk to merge secrets
+		diskCfg, err := config.Load()
+		if err != nil {
+			http.Error(w, "Failed to load existing config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Merge secret: if the key/token in request is "******", retain the original
+		if req.GeminiAPIKey == "******" {
+			req.GeminiAPIKey = diskCfg.GeminiAPIKey
+		}
+		if req.Discord.Token == "******" {
+			req.Discord.Token = diskCfg.Discord.Token
+		}
+
+		// Save merged config to disk
+		if err := config.Save(&req); err != nil {
+			http.Error(w, "Failed to save config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Trigger background Discord bot restart dynamically
+		mgr := discord.GetManager()
+		if mgr != nil {
+			go func() {
+				err := mgr.Restart(req.Discord.Enabled, req.Discord.Token, req.Discord.GuildID, req.Discord.LogChannelID)
+				if err != nil {
+					log.Printf("Dynamic Discord restart error: %v\n", err)
+				}
+			}()
+		}
+
+		controllers.EncodeJSONResponse(map[string]string{"status": "success", "message": "Settings saved successfully"}, http.StatusOK, w)
 	})
 }

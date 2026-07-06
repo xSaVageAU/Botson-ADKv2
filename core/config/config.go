@@ -1,61 +1,88 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // AppConfig holds the application configuration.
 type AppConfig struct {
-	ModelName      string
-	GeminiAPIKey   string
+	ModelName    string        `json:"model_name"`
+	GeminiAPIKey string        `json:"gemini_api_key"`
+	Discord      DiscordConfig `json:"discord"`
 }
 
-// Load loads configuration from the .env file in the executable directory.
+// DiscordConfig holds parameters for the Discord gateway integration.
+type DiscordConfig struct {
+	Enabled      bool   `json:"enabled"`
+	Token        string `json:"token"`
+	GuildID      string `json:"guild_id"`
+	LogChannelID string `json:"log_channel_id"`
+}
+
+// GetConfigPath returns the absolute path to ~/.botsonv2/config.json
+func GetConfigPath() (string, error) {
+	dataDir, err := GetDataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dataDir, "config.json"), nil
+}
+
+// Load loads the configuration from ~/.botsonv2/config.json.
+// If the file does not exist, it returns a default initialized configuration template.
 func Load() (*AppConfig, error) {
-	var envData []byte
-	var err error
+	configPath, err := GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
 
-	// 1. Try reading .env in current working directory (e.g., go run during development)
-	if envData, err = os.ReadFile(".env"); err != nil {
-		// 2. Fall back to executable directory (e.g., compiled production binary)
-		if exePath, err := os.Executable(); err == nil {
-			exeDir := filepath.Dir(exePath)
-			if envData, err = os.ReadFile(filepath.Join(exeDir, ".env")); err == nil {
-				os.Chdir(exeDir)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Return a default configuration template
+			defaultCfg := &AppConfig{
+				ModelName: "gemini-3.1-flash-lite",
 			}
+			// Bootstrap the config file so it physically exists
+			_ = Save(defaultCfg)
+			return defaultCfg, nil
 		}
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Parse .env file if successfully loaded
-	if envData != nil {
-		for _, line := range strings.Split(string(envData), "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				os.Setenv(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-			}
-		}
+	var cfg AppConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config JSON: %w", err)
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		apiKey = os.Getenv("GOOGLE_API_KEY")
+	if cfg.ModelName == "" {
+		cfg.ModelName = "gemini-3.1-flash-lite"
 	}
 
-	if apiKey == "" {
-		return nil, fmt.Errorf("GEMINI_API_KEY or GOOGLE_API_KEY not found in .env or environment")
+	return &cfg, nil
+}
+
+// Save writes the configuration to ~/.botsonv2/config.json.
+func Save(cfg *AppConfig) error {
+	configPath, err := GetConfigPath()
+	if err != nil {
+		return err
 	}
 
-	return &AppConfig{
-		ModelName:    "gemini-3.1-flash-lite",
-		GeminiAPIKey: apiKey,
-	}, nil
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize config JSON: %w", err)
+	}
+
+	err = os.WriteFile(configPath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
 }
 
 // GetDataDir resolves the physical path to ~/.botsonv2/ and ensures it exists.
@@ -70,4 +97,3 @@ func GetDataDir() (string, error) {
 	}
 	return dataDir, nil
 }
-

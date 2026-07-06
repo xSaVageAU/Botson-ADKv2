@@ -104,6 +104,10 @@ window.switchView = async function(viewName) {
     if (typeof window.loadAgentsForBuilder === 'function') {
       await window.loadAgentsForBuilder();
     }
+  } else if (viewName === 'settings') {
+    if (typeof window.loadSettings === 'function') {
+      await window.loadSettings();
+    }
   }
 };
 
@@ -132,4 +136,80 @@ window.showToast = function(message, type = 'success') {
     toast.style.transition = 'opacity 0.25s ease';
     setTimeout(() => toast.remove(), 250);
   }, 4000);
+};
+
+/* ==================== SETTINGS SCRIPTS ==================== */
+window.togglePasswordVisibility = function(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+};
+
+window.toggleDiscordFields = function(checked) {
+  const container = document.getElementById('discordFieldsContainer');
+  if (!container) return;
+  
+  if (checked) {
+    container.classList.remove('disabled-fields');
+  } else {
+    container.classList.add('disabled-fields');
+  }
+  
+  // Update disabled state of input fields
+  container.querySelectorAll('input').forEach(inp => {
+    inp.disabled = !checked;
+  });
+};
+
+window.loadSettings = async function() {
+  try {
+    const res = await fetch('/botson/api/config');
+    if (!res.ok) throw new Error('Failed to load settings');
+    const cfg = await res.json();
+    
+    document.getElementById('geminiApiKeyInput').value = cfg.gemini_api_key || '';
+    document.getElementById('discordEnabledInput').checked = !!(cfg.discord && cfg.discord.enabled);
+    document.getElementById('discordTokenInput').value = (cfg.discord && cfg.discord.token) || '';
+    document.getElementById('discordGuildIdInput').value = (cfg.discord && cfg.discord.guild_id) || '';
+    document.getElementById('discordLogChannelIdInput').value = (cfg.discord && cfg.discord.log_channel_id) || '';
+    
+    window.toggleDiscordFields(!!(cfg.discord && cfg.discord.enabled));
+  } catch (err) {
+    window.showToast('Failed to load configuration settings', 'error');
+  }
+};
+
+window.saveSettings = async function(event) {
+  if (event) event.preventDefault();
+  
+  const payload = {
+    model_name: "gemini-3.1-flash-lite", // Retain standard model default
+    gemini_api_key: document.getElementById('geminiApiKeyInput').value.trim(),
+    discord: {
+      enabled: document.getElementById('discordEnabledInput').checked,
+      token: document.getElementById('discordTokenInput').value.trim(),
+      guild_id: document.getElementById('discordGuildIdInput').value.trim(),
+      log_channel_id: document.getElementById('discordLogChannelIdInput').value.trim()
+    }
+  };
+  
+  try {
+    const res = await fetch('/botson/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to save configuration');
+    }
+    
+    window.showToast('Settings saved successfully', 'success');
+    
+    // Refresh user contexts list in switcher in case a new gateway enabled context is added
+    await window.loadUsers();
+    await window.loadSettings();
+  } catch (err) {
+    window.showToast('Failed to save settings: ' + err.message, 'error');
+  }
 };
