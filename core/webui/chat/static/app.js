@@ -13,7 +13,7 @@ async function loadAgents() {
   selector.innerHTML = '<option value="">Loading agents...</option>';
 
   try {
-    const res = await fetch(`${API_BASE}/apps`);
+    const res = await fetch(`${API_BASE}/list-apps`);
     if (!res.ok) throw new Error('Failed to load apps');
     const apps = await res.json(); // Array of strings e.g. ["general_assistant"]
 
