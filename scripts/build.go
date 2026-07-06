@@ -33,7 +33,7 @@ func main() {
 		name string
 		dir  string
 	}{
-		{"botsonv2", "cmd/adk-web"},
+		{"botsonv2-adk", "cmd/botson-adk"},
 		{"botsonv2-builder", "cmd/agent-builder"},
 		{"botsonv2-prod", "cmd/botson-prod"},
 	}

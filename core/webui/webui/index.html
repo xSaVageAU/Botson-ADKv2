@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Botson Workspace Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/botson/static/css/main.css">
+  <link rel="stylesheet" href="/botson/static/css/dashboard.css">
+  <link rel="stylesheet" href="/botson/static/css/chat.css">
+  <link rel="stylesheet" href="/botson/static/css/builder.css">
+  <script src="/botson/static/js/main.js" defer></script>
+  <script src="/botson/static/js/dashboard.js" defer></script>
+  <script src="/botson/static/js/chat.js" defer></script>
+  <script src="/botson/static/js/builder.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    
+    <!-- Primary Left Sidebar (App Navigation) -->
+    <nav class="primary-sidebar">
+      <div class="sidebar-head">
+        <span class="mark" aria-hidden="true">⌁</span>
+        <h1 class="brand-name">BOTSON</h1>
+      </div>
+      
+      <div class="nav-links">
+        <button class="nav-btn active" id="tab-dashboard" onclick="switchView('dashboard')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Dashboard</span>
+        </button>
+        <button class="nav-btn" id="tab-chat" onclick="switchView('chat')">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Chat Console</span>
+        </button>
+        <button class="nav-btn" id="tab-builder" onclick="switchView('builder')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Agent Builder</span>
+        </button>
+      </div>
+
+      <div class="sidebar-foot">
+        <span class="status-dot green"></span>
+        <span class="status-text">Production</span>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="content-wrapper">
+
+      <!-- ==================== DASHBOARD VIEW ==================== -->
+      <main class="view-panel active" id="view-dashboard">
+        <header class="view-header">
+          <div>
+            <span class="eyebrow">workspace dashboard</span>
+            <h2>System Overview</h2>
+          </div>
+        </header>
+
+        <div class="dashboard-container">
+          <!-- Stats Grid -->
+          <section class="stats-section">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-label">Total Agents</span>
+                <span class="stat-value" id="statAgents">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Active Sessions</span>
+                <span class="stat-value" id="statSessions">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Message Events</span>
+                <span class="stat-value" id="statEvents">--</span>
+              </div>
+              <div class="stat-card span-2">
+                <span class="stat-label">Database Location</span>
+                <span class="stat-value path-value" id="statDbPath">--</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Tables Grid -->
+          <div class="info-split">
+            <section class="info-section">
+              <h3 class="section-title">Active Registry</h3>
+              <div class="table-container">
+                <table id="agentsTable">
+                  <thead>
+                    <tr>
+                      <th>Agent Name</th>
+                      <th>Description</th>
+                      <th>Role</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colspan="4" class="loading-cell">Querying registry...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="info-section">
+              <h3 class="section-title">Recent Chat Activity</h3>
+              <div class="table-container">
+                <table id="sessionsTable">
+                  <thead>
+                    <tr>
+                      <th>Session Title</th>
+                      <th>Agent</th>
+                      <th>Last Update</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colspan="3" class="loading-cell">Loading sessions...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      <!-- ==================== CHAT VIEW ==================== -->
+      <div class="view-panel" id="view-chat">
+        <div class="sub-layout">
+          <!-- Secondary Left Rail: Agent Selector & Session List -->
+          <aside class="sub-rail">
+            <div class="rail-header-text">Chat Registry</div>
+            
+            <div class="field" style="margin-bottom: 16px;">
+              <label for="agentSelector">Active Agent</label>
+              <select id="agentSelector" onchange="switchAgent()">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <button class="btn btn-primary btn-new-action" onclick="startNewSession()">
+              <span class="plus" aria-hidden="true">+</span> New Chat
+            </button>
+
+            <div class="rail-list-head">
+              <span>Sessions</span>
+              <span class="rail-list-count" id="sessionCount">0</span>
+            </div>
+            
+            <ul class="session-list" id="sessionList">
+              <!-- Populated dynamically -->
+            </ul>
+          </aside>
+
+          <!-- Central Chat Pane -->
+          <main class="chat-pane" id="chatWorkspace">
+            <header class="chat-header">
+              <div>
+                <span class="eyebrow" id="activeAgentSub">AGENT</span>
+                <h3 id="activeAgentName">No Agent Selected</h3>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="pill pill-accent" id="sessionPill">no session</span>
+                <button class="btn btn-secondary" onclick="toggleInspector()">⚙ Inspect</button>
+              </div>
+            </header>
+
+            <div class="chat-log" id="chatLog">
+              <div class="welcome-message">
+                <h2>Welcome to Botson Custom Chat</h2>
+                <p>Choose an agent from the dropdown on the left to start a dynamic chat thread. Any tool executions or background agent reasoning will render inline in real-time!</p>
+              </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator">
+              <span class="indicator-dot"></span>
+              <span class="indicator-dot"></span>
+              <span class="indicator-dot"></span>
+              <span class="indicator-text">Agent is thinking...</span>
+            </div>
+
+            <!-- Input bar -->
+            <div class="chat-input-bar">
+              <textarea id="messageInput" placeholder="Type a message... (Ctrl+Enter to send)" onkeydown="handleInputKey(event)"></textarea>
+              <button class="btn btn-primary btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+          </main>
+
+          <!-- Right Collapsible Inspector Panel -->
+          <aside class="inspector-drawer" id="inspectorDrawer">
+            <div class="drawer-header">
+              <h4>Session Inspector</h4>
+              <button class="btn-close-drawer" onclick="toggleInspector()">✕</button>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="drawer-tabs">
+              <button class="tab-btn active" id="btn-tab-state" onclick="switchInspectorTab('state')">State</button>
+              <button class="tab-btn" id="btn-tab-artifacts" onclick="switchInspectorTab('artifacts')">Artifacts</button>
+              <button class="tab-btn" id="btn-tab-telemetry" onclick="switchInspectorTab('telemetry')">Telemetry</button>
+            </div>
+
+            <!-- Tab Content: State -->
+            <div class="tab-content active" id="tab-state">
+              <div class="state-inspector" id="stateInspector">
+                <span class="empty-state">No state keys loaded</span>
+              </div>
+            </div>
+
+            <!-- Tab Content: Artifacts -->
+            <div class="tab-content" id="tab-artifacts">
+              <ul class="artifact-list" id="artifactList">
+                <!-- Populated dynamically -->
+              </ul>
+              <div class="artifact-viewer" id="artifactViewer">
+                <div class="viewer-header">
+                  <span class="viewer-title" id="artifactViewerTitle">No artifact loaded</span>
+                  <span class="viewer-version" id="artifactViewerVersion"></span>
+                </div>
+                <pre class="viewer-code" id="artifactViewerCode"><span class="empty-state">Select an artifact to preview its content</span></pre>
+              </div>
+            </div>
+
+            <!-- Tab Content: Telemetry -->
+            <div class="tab-content" id="tab-telemetry">
+              <div class="telemetry-timeline" id="telemetryTimeline">
+                <!-- Populated dynamically -->
+                <span class="empty-state">No telemetry data captured</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ==================== BUILDER VIEW ==================== -->
+      <div class="view-panel" id="view-builder">
+        <div class="sub-layout">
+          <!-- Secondary Left Rail: Registered Agents -->
+          <aside class="sub-rail">
+            <div class="rail-header-text">Agent Registry</div>
+
+            <button class="btn btn-primary btn-new-action" onclick="openNewAgentForm()">
+              <span class="plus" aria-hidden="true">+</span> New agent
+            </button>
+
+            <div class="rail-list-head">
+              <span>Registry</span>
+              <span class="rail-list-count" id="agentCount">0</span>
+            </div>
+
+            <ul class="node-list" id="agentList">
+              <!-- Populated dynamically -->
+            </ul>
+
+            <div class="rail-foot">
+              writes to <code>~/.botsonv2/agents/</code>
+            </div>
+          </aside>
+
+          <!-- Central Config Editor -->
+          <main class="builder-pane" id="workspace">
+            <div class="welcome" id="builder-welcome">
+              <svg class="welcome-diagram" viewBox="0 0 320 120" width="320" height="120" role="presentation" aria-hidden="true">
+                <line x1="40" y1="60" x2="140" y2="30" class="w-trace"></line>
+                <line x1="40" y1="60" x2="140" y2="90" class="w-trace"></line>
+                <line x1="140" y1="30" x2="260" y2="30" class="w-trace"></line>
+                <line x1="140" y1="90" x2="260" y2="60" class="w-trace"></line>
+                <line x1="140" y1="90" x2="260" y2="100" class="w-trace"></line>
+                <circle cx="40" cy="60" r="7" class="w-node w-node-main"></circle>
+                <circle cx="140" cy="30" r="5" class="w-node"></circle>
+                <circle cx="140" cy="90" r="5" class="w-node"></circle>
+                <circle cx="260" cy="30" r="4" class="w-node w-node-dim"></circle>
+                <circle cx="260" cy="60" r="4" class="w-node w-node-dim"></circle>
+                <circle cx="260" cy="100" r="4" class="w-node w-node-dim"></circle>
+              </svg>
+              <h2>Nothing selected yet</h2>
+              <p>Pick an agent from the registry, or create one to start wiring up its prompt, tools, and sub-agent delegation. Changes save straight to your local <code>~/.botsonv2/agents/</code> directory.</p>
+            </div>
+            
+            <div class="editor-container" id="builder-editor" style="display: none;">
+              <!-- Populated dynamically via renderForm in JS -->
+            </div>
+          </main>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast-rack" id="toastContainer"></div>
+</body>
+</html>

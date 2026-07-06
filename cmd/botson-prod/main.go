@@ -5,10 +5,9 @@ import (
 	coreartifact "botsonv2/core/artifact"
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
-	"botsonv2/core/webui/builder"
-	"botsonv2/core/webui/chat"
-	"botsonv2/core/webui/dashboard"
+	"botsonv2/core/webui"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -28,6 +27,11 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Define standard flags directly to drop positional ADK parameters
+	portFlag := flag.Int("port", 8080, "Port to run the unified server on")
+	otelFlag := flag.Bool("otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
+	flag.Parse()
 
 	// Load Configuration
 	appConfig, err := config.Load()
@@ -90,21 +94,24 @@ func main() {
 		AgentLoader:     loader,
 	}
 
+	// We configure the launcher with only ADK's production sublaunchers (REST and A2A) and our custom console
 	customLauncher := universal.NewLauncher(
 		web.NewLauncher(
 			api.NewLauncher(),
-			chat.NewSublauncher(),
-			builder.NewSublauncher(),
-			dashboard.NewSublauncher(),
 			a2a.NewLauncher(),
+			webui.NewSublauncher(),
 		),
 	)
 
-	// Execute the Unified REST & UI Web server (port :8080 by default)
-	fmt.Println("Starting unified production server... please do not close this window.")
+	// Execute the Unified REST & UI Web server
+	fmt.Printf("Starting production server on http://localhost:%d... please do not close this window.\n", *portFlag)
 	
-	// Pass arguments to Execute: "web" triggers the web launcher, which boots all registered sublaunchers
-	args := []string{"web", "api", "chat", "builder", "dashboard"}
+	args := []string{
+		"web",
+		fmt.Sprintf("-port=%d", *portFlag),
+		fmt.Sprintf("-otel_to_cloud=%t", *otelFlag),
+		"api", "a2a", "botson",
+	}
 	
 	if err = customLauncher.Execute(ctx, configLauncher, args); err != nil {
 		if ctx.Err() != nil {

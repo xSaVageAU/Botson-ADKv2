@@ -1,53 +1,17 @@
-package dashboard
+package webui
 
 import (
-	"botsonv2/core/config"
-	"embed"
-	"flag"
-	"fmt"
-	"io/fs"
 	"net/http"
 	"path/filepath"
 	"sort"
 
 	"github.com/gorilla/mux"
 
+	"botsonv2/core/config"
 	"google.golang.org/adk/v2/cmd/launcher"
-	weblauncher "google.golang.org/adk/v2/cmd/launcher/web"
 	"google.golang.org/adk/v2/server/adkrest/controllers"
 	"google.golang.org/adk/v2/session"
 )
-
-//go:embed index.html static/*
-var content embed.FS
-
-type dashboardSublauncher struct {
-	flags *flag.FlagSet
-}
-
-func (d *dashboardSublauncher) Keyword() string {
-	return "dashboard"
-}
-
-func (d *dashboardSublauncher) Parse(args []string) ([]string, error) {
-	err := d.flags.Parse(args)
-	if err != nil || !d.flags.Parsed() {
-		return nil, fmt.Errorf("failed to parse dashboard flags: %v", err)
-	}
-	return d.flags.Args(), nil
-}
-
-func (d *dashboardSublauncher) CommandLineSyntax() string {
-	return ""
-}
-
-func (d *dashboardSublauncher) SimpleDescription() string {
-	return "starts Botson Workspace Dashboard Interface"
-}
-
-func (d *dashboardSublauncher) UserMessage(webURL string, printer func(v ...any)) {
-	printer(fmt.Sprintf("    dashboard:  you can access Workspace Dashboard using %s/dashboard/", webURL))
-}
 
 // AgentStat matches JSON output structure for agents listing
 type AgentStat struct {
@@ -76,44 +40,13 @@ type DashboardStats struct {
 	RecentSessions []SessionStat `json:"recentSessions"`
 }
 
-func (d *dashboardSublauncher) SetupSubrouters(router *mux.Router, configLauncher *launcher.Config) error {
-	pathPrefix := "/dashboard/"
-
-	rDashboard := router.Methods("GET").PathPrefix(pathPrefix).Subrouter()
-
-	// Redirect /dashboard to /dashboard/
-	router.Methods("GET").Path("/dashboard").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, pathPrefix, http.StatusFound)
-	})
-
-	// Redirect root / to /dashboard/
-	router.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, pathPrefix, http.StatusFound)
-	})
-
-	// Serve the main dashboard HTML
-	rDashboard.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		data, err := content.ReadFile("index.html")
-		if err != nil {
-			http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
+func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
+	// GET /botson/api/stats - returns calculated system stats
+	r.Methods("GET").Path("/stats").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if configLauncher == nil || configLauncher.AgentLoader == nil {
+			http.Error(w, "Stats not available in standalone mode", http.StatusNotImplemented)
 			return
 		}
-		w.Write(data)
-	})
-
-	// Serve static files (under /dashboard/static/...)
-	staticFS, err := fs.Sub(content, "static")
-	if err != nil {
-		return fmt.Errorf("cannot prepare dashboard static files: %v", err)
-	}
-	rDashboard.PathPrefix("/static/").Handler(http.StripPrefix(pathPrefix+"static/", http.FileServer(http.FS(staticFS))))
-
-	// Mount Dashboard API under /dashboard/api/
-	rAPI := router.PathPrefix("/dashboard/api").Subrouter()
-
-	// GET /dashboard/api/stats - returns calculated system stats
-	rAPI.Methods("GET").Path("/stats").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		
 		dataDir, err := config.GetDataDir()
@@ -198,7 +131,6 @@ func (d *dashboardSublauncher) SetupSubrouters(router *mux.Router, configLaunche
 			recentSessions = recentSessions[:10]
 		}
 
-		// Build response payload
 		dashboardResponse := DashboardStats{
 			TotalAgents:    totalAgents,
 			TotalSessions:  totalSessions,
@@ -210,13 +142,4 @@ func (d *dashboardSublauncher) SetupSubrouters(router *mux.Router, configLaunche
 
 		controllers.EncodeJSONResponse(dashboardResponse, http.StatusOK, w)
 	})
-
-	return nil
-}
-
-// NewSublauncher creates a new Sublauncher for the Workspace Dashboard.
-func NewSublauncher() weblauncher.Sublauncher {
-	return &dashboardSublauncher{
-		flags: flag.NewFlagSet("dashboard", flag.ContinueOnError),
-	}
 }
