@@ -48,11 +48,15 @@
       <!-- User Switcher -->
       <div class="user-switcher-section">
         <span class="switcher-label">Active User Context</span>
-        <div class="switcher-dropdown-wrapper">
-          <span class="switcher-icon">👤</span>
-          <select id="userSelect" onchange="changeCurrentUser(this.value)">
-            <option value="user">user</option>
-          </select>
+        <div class="custom-dropdown" id="userSwitcherDropdown">
+          <button type="button" class="dropdown-trigger" onclick="window.toggleUserDropdown(event)">
+            <span class="switcher-icon">👤</span>
+            <span id="currentUserLabel">user</span>
+            <span class="dropdown-arrow">▾</span>
+          </button>
+          <div class="dropdown-menu" id="userDropdownMenu">
+            <!-- Populated dynamically via loadUsers in JS -->
+          </div>
         </div>
       </div>
 

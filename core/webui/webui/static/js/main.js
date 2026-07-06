@@ -27,17 +27,25 @@ window.loadUsers = async function() {
     if (!res.ok) throw new Error('failed to load users');
     const users = await res.json();
     
-    const select = document.getElementById('userSelect');
-    if (select) {
-      select.innerHTML = '';
+    const label = document.getElementById('currentUserLabel');
+    if (label) {
+      label.textContent = window.currentUser;
+    }
+
+    const menu = document.getElementById('userDropdownMenu');
+    if (menu) {
+      menu.innerHTML = '';
       users.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u;
-        opt.textContent = u;
-        if (u === window.currentUser) {
-          opt.selected = true;
-        }
-        select.appendChild(opt);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `dropdown-item ${u === window.currentUser ? 'active' : ''}`;
+        btn.textContent = u;
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          menu.classList.remove('show');
+          await window.changeCurrentUser(u);
+        };
+        menu.appendChild(btn);
       });
     }
   } catch (err) {
@@ -45,8 +53,35 @@ window.loadUsers = async function() {
   }
 };
 
+window.toggleUserDropdown = function(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) {
+    menu.classList.toggle('show');
+  }
+};
+
+// Global click-outside listener to close custom dropdown
+document.addEventListener('click', () => {
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) {
+    menu.classList.remove('show');
+  }
+});
+
 window.changeCurrentUser = async function(newUser) {
   window.currentUser = newUser;
+  
+  const label = document.getElementById('currentUserLabel');
+  if (label) {
+    label.textContent = newUser;
+  }
+  
+  // Update active states on item buttons
+  document.querySelectorAll('#userDropdownMenu .dropdown-item').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === newUser);
+  });
+
   window.showToast(`Switched context to user: ${newUser}`, 'success');
   
   if (window.activeView === 'dashboard') {
