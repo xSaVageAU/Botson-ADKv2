@@ -3,9 +3,9 @@ package main
 import (
 	"botsonv2/core/agent"
 	coreartifact "botsonv2/core/artifact"
-	"botsonv2/core/builder"
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
+	"botsonv2/core/webui/builder"
 	"context"
 	"fmt"
 	"log"

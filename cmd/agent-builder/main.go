@@ -1,7 +1,7 @@
 package main
 
 import (
-	"botsonv2/core/builder"
+	"botsonv2/core/webui/builder"
 	"log"
 )
 
