@@ -69,7 +69,8 @@ window.loadSessions = async function() {
   try {
     const res = await fetch(`/api/apps/${window.activeAgent}/users/${window.currentUser}/sessions`);
     if (!res.ok) throw new Error('Failed to load sessions');
-    const sessions = await res.json();
+    let sessions = await res.json();
+    if (!sessions) sessions = [];
 
     listEl.innerHTML = '';
     document.getElementById('sessionCount').textContent = sessions.length;

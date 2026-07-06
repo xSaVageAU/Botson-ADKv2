@@ -17,6 +17,7 @@ window.currentAgent = null;
 
 // Initial bootstrap
 window.addEventListener('DOMContentLoaded', async () => {
+  await window.loadSettings();
   await window.loadUsers();
   await window.switchView('dashboard');
 });
