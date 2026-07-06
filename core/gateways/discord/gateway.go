@@ -15,6 +15,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
+	"botsonv2/core/config"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/runner"
@@ -76,6 +77,18 @@ func (g *Gateway) Start() error {
 			Name:        "info",
 			Description: "Show details of the currently active session in this channel",
 		},
+		{
+			Name:        "approve",
+			Description: "Approve a user's pending access code (Admin/Owner only)",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "code",
+					Description: "The authorization code to approve (e.g. AUTH-123456)",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	guildID := os.Getenv("DISCORD_GUILD_ID")
@@ -128,12 +141,62 @@ func (g *Gateway) Close() error {
 	return g.session.Close()
 }
 
+func (g *Gateway) isAuthorized(userID string, member *discordgo.Member) bool {
+	cfg, err := config.Load()
+	if err != nil {
+		return false
+	}
+	// Owner is always authorized
+	if cfg.Discord.OwnerID != "" && userID == cfg.Discord.OwnerID {
+		return true
+	}
+	// Check whitelist
+	for _, id := range cfg.Discord.Whitelist {
+		if id == userID {
+			return true
+		}
+	}
+	// Fallback: If OwnerID is not configured, allow users with Administrator permissions in the server
+	if cfg.Discord.OwnerID == "" && member != nil {
+		if member.Permissions&discordgo.PermissionAdministrator != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *Gateway) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type != discordgo.InteractionApplicationCommand {
 		return
 	}
 
 	cmdName := i.ApplicationCommandData().Name
+	userID := i.Member.User.ID
+
+	if cmdName == "approve" {
+		g.executeApproveCommand(s, i)
+		return
+	}
+
+	// Check whitelisting authorization gate
+	if !g.isAuthorized(userID, i.Member) {
+		code := GetManager().AddPendingRequest(userID, i.Member.User.Username, i.ChannelID)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags: discordgo.MessageFlagsEphemeral,
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Title:       "🔒 Access Denied",
+						Description: fmt.Sprintf("You are not authorized to interact with this agent.\n\nPlease ask the bot administrator to approve your access code:\n\n**`%s`**", code),
+						Color:       0xff3333,
+					},
+				},
+			},
+		})
+		return
+	}
+
 	rootAgent := g.config.AgentLoader.RootAgent()
 	if rootAgent == nil {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -162,6 +225,75 @@ func (g *Gateway) handleInteraction(s *discordgo.Session, i *discordgo.Interacti
 	case "info":
 		g.executeInfoCommand(s, i, ctx, rootAgent.Name())
 	}
+}
+
+func (g *Gateway) executeApproveCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	cfg, err := config.Load()
+	if err != nil {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags:   discordgo.MessageFlagsEphemeral,
+				Content: "❌ **Failed to load configurations**.",
+			},
+		})
+		return
+	}
+
+	isOwner := cfg.Discord.OwnerID != "" && i.Member.User.ID == cfg.Discord.OwnerID
+	isAdmin := i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	if !isOwner && !isAdmin {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags:   discordgo.MessageFlagsEphemeral,
+				Content: "❌ **Permission Denied**: Only the bot owner or server administrators can approve access codes.",
+			},
+		})
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	var codeVal string
+	if len(options) > 0 {
+		codeVal = options[0].StringValue()
+	}
+
+	if codeVal == "" {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags:   discordgo.MessageFlagsEphemeral,
+				Content: "❌ **Failed**: Access code parameter is missing.",
+			},
+		})
+		return
+	}
+
+	approvedUserID, err := GetManager().ApproveRequest(codeVal)
+	if err != nil {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags:   discordgo.MessageFlagsEphemeral,
+				Content: fmt.Sprintf("❌ **Approval Failed**: %v", err),
+			},
+		})
+		return
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{
+				{
+					Title:       "✅ Access Granted",
+					Description: fmt.Sprintf("User <@%s> has been successfully whitelisted!", approvedUserID),
+					Color:       0x33ff33,
+				},
+			},
+		},
+	})
 }
 
 func (g *Gateway) executeNewCommand(s *discordgo.Session, i *discordgo.InteractionCreate, ctx context.Context, agentName string) {
@@ -367,6 +499,18 @@ func (g *Gateway) handleMessage(s *discordgo.Session, m *discordgo.MessageCreate
 	}
 
 	if isDM || mentioned {
+		// Whitelist Authorization check
+		if !g.isAuthorized(m.Author.ID, m.Member) {
+			code := GetManager().AddPendingRequest(m.Author.ID, m.Author.Username, m.ChannelID)
+			embed := &discordgo.MessageEmbed{
+				Title:       "🔒 Access Denied",
+				Description: fmt.Sprintf("You are not authorized to interact with this agent.\n\nPlease ask the bot administrator to approve your access code:\n\n**`%s`**", code),
+				Color:       0xff3333,
+			}
+			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			return
+		}
+
 		text := content
 		// Strip mentions
 		text = strings.ReplaceAll(text, fmt.Sprintf("<@%s>", s.State.User.ID), "")

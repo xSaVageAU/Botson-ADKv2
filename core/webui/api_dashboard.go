@@ -244,4 +244,78 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 
 		controllers.EncodeJSONResponse(map[string]string{"status": "success", "message": "Settings saved successfully"}, http.StatusOK, w)
 	})
+
+	// GET /botson/api/discord/pending - lists all pending authorization requests
+	r.Methods("GET").Path("/discord/pending").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mgr := discord.GetManager()
+		if mgr == nil {
+			controllers.EncodeJSONResponse([]discord.PendingRequest{}, http.StatusOK, w)
+			return
+		}
+		controllers.EncodeJSONResponse(mgr.GetPendingRequests(), http.StatusOK, w)
+	})
+
+	// POST /botson/api/discord/approve - approves a pending user by code or ID
+	r.Methods("POST").Path("/discord/approve").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Code string `json:"code"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+		if req.Code == "" {
+			http.Error(w, "Code or UserID is required", http.StatusBadRequest)
+			return
+		}
+
+		mgr := discord.GetManager()
+		if mgr == nil {
+			http.Error(w, "Discord manager not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		approvedUserID, err := mgr.ApproveRequest(req.Code)
+		if err != nil {
+			http.Error(w, "Approval failed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		controllers.EncodeJSONResponse(map[string]string{
+			"status":  "success",
+			"message": "User whitelisted successfully",
+			"user_id": approvedUserID,
+		}, http.StatusOK, w)
+	})
+
+	// POST /botson/api/discord/remove-whitelisted - removes a user from whitelist
+	r.Methods("POST").Path("/discord/remove-whitelisted").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			UserID string `json:"user_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+		if req.UserID == "" {
+			http.Error(w, "UserID is required", http.StatusBadRequest)
+			return
+		}
+
+		mgr := discord.GetManager()
+		if mgr == nil {
+			http.Error(w, "Discord manager not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		if err := mgr.RemoveWhitelistedUser(req.UserID); err != nil {
+			http.Error(w, "Removal failed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		controllers.EncodeJSONResponse(map[string]string{
+			"status":  "success",
+			"message": "User removed from whitelist successfully",
+		}, http.StatusOK, w)
+	})
 }

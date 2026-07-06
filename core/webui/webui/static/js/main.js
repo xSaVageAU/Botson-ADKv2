@@ -170,12 +170,124 @@ window.loadSettings = async function() {
     document.getElementById('geminiApiKeyInput').value = cfg.gemini_api_key || '';
     document.getElementById('discordEnabledInput').checked = !!(cfg.discord && cfg.discord.enabled);
     document.getElementById('discordTokenInput').value = (cfg.discord && cfg.discord.token) || '';
+    document.getElementById('discordOwnerIdInput').value = (cfg.discord && cfg.discord.owner_id) || '';
     document.getElementById('discordGuildIdInput').value = (cfg.discord && cfg.discord.guild_id) || '';
     document.getElementById('discordLogChannelIdInput').value = (cfg.discord && cfg.discord.log_channel_id) || '';
     
+    // Save whitelist locally to preserve on settings save
+    window.currentWhitelist = (cfg.discord && cfg.discord.whitelist) || [];
+    
     window.toggleDiscordFields(!!(cfg.discord && cfg.discord.enabled));
+    
+    // Populate Access Control lists
+    await window.renderAccessControl(window.currentWhitelist);
   } catch (err) {
     window.showToast('Failed to load configuration settings', 'error');
+  }
+};
+
+window.renderAccessControl = async function(whitelist) {
+  // 1. Render Active Whitelist Table
+  const wlBody = document.getElementById('activeWhitelistBody');
+  if (wlBody) {
+    wlBody.innerHTML = '';
+    if (!whitelist || whitelist.length === 0) {
+      wlBody.innerHTML = `<tr><td colspan="2" class="empty-table-state">No users whitelisted yet.</td></tr>`;
+    } else {
+      whitelist.forEach(uid => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-family: var(--font-mono); font-size: 13px; color: var(--text);">${window.escapeHtml(uid)}</td>
+          <td>
+            <button type="button" class="btn-action-revoke" onclick="window.revokeUserAccess('${uid}')">Revoke Access</button>
+          </td>
+        `;
+        wlBody.appendChild(tr);
+      });
+    }
+  }
+  
+  // Hide Access Control Card if Discord bot is disabled entirely
+  const enabled = document.getElementById('discordEnabledInput').checked;
+  const acCard = document.getElementById('discordAccessControlCard');
+  if (acCard) {
+    if (enabled) {
+      acCard.style.display = 'flex';
+    } else {
+      acCard.style.display = 'none';
+    }
+  }
+
+  if (!enabled) return;
+
+  // 2. Fetch and Render Pending Authorization Requests
+  try {
+    const res = await fetch('/botson/api/discord/pending');
+    if (!res.ok) throw new Error('Failed to fetch pending requests');
+    const pending = await res.json();
+    
+    const pendBody = document.getElementById('pendingAuthsBody');
+    if (pendBody) {
+      pendBody.innerHTML = '';
+      if (!pending || pending.length === 0) {
+        pendBody.innerHTML = `<tr><td colspan="4" class="empty-table-state">No pending authorization requests.</td></tr>`;
+      } else {
+        pending.forEach(req => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="font-weight: 500;">${window.escapeHtml(req.username)}</td>
+            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">${window.escapeHtml(req.user_id)}</td>
+            <td style="font-family: var(--font-mono); font-weight: 600; color: var(--accent);">${window.escapeHtml(req.code)}</td>
+            <td>
+              <button type="button" class="btn-action-approve" onclick="window.approveUserAccess('${req.code}')">Approve</button>
+            </td>
+          `;
+          pendBody.appendChild(tr);
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching pending authorizations:', err);
+  }
+};
+
+window.approveUserAccess = async function(code) {
+  try {
+    const res = await fetch('/botson/api/discord/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to approve user');
+    }
+    
+    window.showToast('User authorized and added to whitelist', 'success');
+    await window.loadSettings();
+  } catch (err) {
+    window.showToast('Failed to approve user: ' + err.message, 'error');
+  }
+};
+
+window.revokeUserAccess = async function(userID) {
+  if (!confirm(`Are you sure you want to revoke whitelist access for user ID ${userID}?`)) return;
+  
+  try {
+    const res = await fetch('/botson/api/discord/remove-whitelisted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userID })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to revoke access');
+    }
+    
+    window.showToast('User access revoked successfully', 'success');
+    await window.loadSettings();
+  } catch (err) {
+    window.showToast('Failed to revoke access: ' + err.message, 'error');
   }
 };
 
@@ -188,8 +300,10 @@ window.saveSettings = async function(event) {
     discord: {
       enabled: document.getElementById('discordEnabledInput').checked,
       token: document.getElementById('discordTokenInput').value.trim(),
+      owner_id: document.getElementById('discordOwnerIdInput').value.trim(),
       guild_id: document.getElementById('discordGuildIdInput').value.trim(),
-      log_channel_id: document.getElementById('discordLogChannelIdInput').value.trim()
+      log_channel_id: document.getElementById('discordLogChannelIdInput').value.trim(),
+      whitelist: window.currentWhitelist || []
     }
   };
   
