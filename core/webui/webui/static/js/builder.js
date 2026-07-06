@@ -186,7 +186,7 @@ window.renderForm = function(agentData) {
     </div>
 
     <div class="switch-row">
-      <label class="switch">
+      <label class="builder-switch">
         <input type="checkbox" id="agentRootInput" ${agentData.is_root ? 'checked' : ''}>
         <span>Is Root (Entry point)</span>
       </label>

@@ -175,9 +175,9 @@
   background: var(--panel);
 }
 
-.switch { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13px; }
+.builder-switch { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13px; }
 
-.switch input {
+.builder-switch input {
   appearance: none;
   width: 30px;
   height: 17px;
@@ -189,7 +189,7 @@
   transition: background 0.15s ease;
 }
 
-.switch input::before {
+.builder-switch input::before {
   content: '';
   position: absolute;
   top: 2px;
@@ -201,8 +201,8 @@
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.switch input:checked { background: var(--accent-soft); }
-.switch input:checked::before { transform: translateX(13px); background: var(--accent); }
+.builder-switch input:checked { background: var(--accent-soft); }
+.builder-switch input:checked::before { transform: translateX(13px); background: var(--accent); }
 
 /* Tool groups */
 .group { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; background: var(--panel); }
