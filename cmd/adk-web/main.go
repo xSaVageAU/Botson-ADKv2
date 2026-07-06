@@ -3,6 +3,7 @@ package main
 import (
 	"botsonv2/core/agent"
 	coreartifact "botsonv2/core/artifact"
+	"botsonv2/core/builder"
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
 	"context"
@@ -95,6 +96,18 @@ func main() {
 		fmt.Scanln()
 		os.Exit(1)
 	}
+
+	// Start the Agent Builder background service
+	go func() {
+		builderPort := os.Getenv("BUILDER_PORT")
+		if builderPort == "" {
+			builderPort = ":8081"
+		}
+		log.Printf("Starting Agent Builder background service on http://localhost%s\n", builderPort)
+		if err := builder.StartServer(builderPort); err != nil {
+			log.Printf("Agent Builder background service failed to run: %v\n", err)
+		}
+	}()
 
 	fmt.Println("Starting server... please do not close this window.")
 	if err = webLauncher.Run(ctx, configLauncher); err != nil {

@@ -67,6 +67,7 @@ function selectAgent(agent) {
   renderForm(agent);
 }
 
+// Re-registers custom tool checks, wiring strip updates and heading name updates
 function openNewAgentForm() {
   currentAgent = null;
   renderSidebar();
