@@ -90,13 +90,19 @@ async function loadSessions() {
     sessions.forEach(s => {
       const li = document.createElement('li');
       li.className = `session-row ${activeSessionId === s.id ? 'active' : ''}`;
+      li.dataset.id = s.id;
       li.onclick = () => selectSession(s.id);
 
       const timeStr = new Date(s.lastUpdateTime * 1000).toLocaleString();
 
+      let title = s.id;
+      if (s.state && s.state.__session_metadata__ && s.state.__session_metadata__.displayName) {
+        title = s.state.__session_metadata__.displayName;
+      }
+
       li.innerHTML = `
         <div class="session-info">
-          <span class="session-id-text">${escapeHtml(s.id)}</span>
+          <span class="session-id-text" title="${escapeHtml(s.id)}">${escapeHtml(title)}</span>
           <span class="session-time-text">${timeStr}</span>
         </div>
         <button class="btn-delete-session" onclick="deleteSession(event, '${s.id}')" title="Delete session">🗑</button>
@@ -119,8 +125,7 @@ async function selectSession(sessionId) {
   
   // Highlight active session row in list
   document.querySelectorAll('.session-row').forEach(row => {
-    const id = row.querySelector('.session-id-text').textContent;
-    row.className = `session-row ${id === sessionId ? 'active' : ''}`;
+    row.className = `session-row ${row.dataset.id === sessionId ? 'active' : ''}`;
   });
 
   document.getElementById('sessionPill').textContent = sessionId;
@@ -133,6 +138,14 @@ async function selectSession(sessionId) {
     const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${sessionId}`);
     if (!res.ok) throw new Error('Failed to load session details');
     const sessionData = await res.json();
+
+    // Set Header Title to displayName or ID
+    let title = sessionData.id;
+    if (sessionData.state && sessionData.state.__session_metadata__ && sessionData.state.__session_metadata__.displayName) {
+      title = sessionData.state.__session_metadata__.displayName;
+    }
+    document.getElementById('activeAgentName').textContent = title;
+    document.getElementById('activeAgentSub').textContent = `SESSION: ${activeAgent}`;
 
     // Render historical events
     if (sessionData.events && sessionData.events.length > 0) {
@@ -246,6 +259,15 @@ async function sendMessage() {
     }
   };
 
+  const isFirstMessage = document.querySelectorAll('.message-row.user').length === 1;
+  if (isFirstMessage) {
+    payload.stateDelta = {
+      "__session_metadata__": {
+        "displayName": text
+      }
+    };
+  }
+
   try {
     const res = await fetch(`${API_BASE}/run_sse`, {
       method: 'POST',
@@ -309,6 +331,7 @@ async function sendMessage() {
     await fetchSessionState();
     await loadArtifacts();
     await loadTelemetry();
+    await loadSessions();
   } catch (err) {
     indicator.classList.remove('active');
     showToast(err.message, 'error');
