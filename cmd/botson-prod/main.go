@@ -7,6 +7,7 @@ import (
 	coresession "botsonv2/core/session"
 	"botsonv2/core/webui/builder"
 	"botsonv2/core/webui/chat"
+	"botsonv2/core/webui/dashboard"
 	"context"
 	"fmt"
 	"log"
@@ -94,6 +95,7 @@ func main() {
 			api.NewLauncher(),
 			chat.NewSublauncher(),
 			builder.NewSublauncher(),
+			dashboard.NewSublauncher(),
 			a2a.NewLauncher(),
 		),
 	)
@@ -102,7 +104,7 @@ func main() {
 	fmt.Println("Starting unified production server... please do not close this window.")
 	
 	// Pass arguments to Execute: "web" triggers the web launcher, which boots all registered sublaunchers
-	args := []string{"web", "api", "chat", "builder"}
+	args := []string{"web", "api", "chat", "builder", "dashboard"}
 	
 	if err = customLauncher.Execute(ctx, configLauncher, args); err != nil {
 		if ctx.Err() != nil {

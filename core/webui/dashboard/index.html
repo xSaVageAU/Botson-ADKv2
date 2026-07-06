@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Botson Workspace Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/style.css">
+  <script src="static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    
+    <!-- Top Brand Bar -->
+    <header class="top-nav">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">⌁</span>
+        <div>
+          <h1 class="brand-name">BOTSON</h1>
+          <span class="brand-sub">workspace dashboard</span>
+        </div>
+      </div>
+      <div class="system-status">
+        <span class="status-dot green"></span>
+        <span class="status-text">Unified Server Active</span>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="dashboard-container">
+      
+      <!-- Quick Nav Grid -->
+      <section class="nav-section">
+        <h2 class="section-title">Applications</h2>
+        <div class="card-grid">
+          
+          <a href="/chat/" class="nav-card">
+            <div class="card-accent chat-accent"></div>
+            <div class="card-body">
+              <span class="card-icon">💬</span>
+              <h3>Custom Chat</h3>
+              <p>Interact with registered agents in real-time, inspect variables, telemetry traces, and track generated artifacts.</p>
+            </div>
+            <div class="card-footer">
+              <span>Open Chat Interface</span>
+              <span class="arrow">→</span>
+            </div>
+          </a>
+
+          <a href="/builder/" class="nav-card">
+            <div class="card-accent builder-accent"></div>
+            <div class="card-body">
+              <span class="card-icon">⚙️</span>
+              <h3>Agent Registry</h3>
+              <p>Wire up custom agents, specify standard tool capabilities, configure instructions, and delegate sub-agent actions.</p>
+            </div>
+            <div class="card-footer">
+              <span>Open Builder Dashboard</span>
+              <span class="arrow">→</span>
+            </div>
+          </a>
+
+        </div>
+      </section>
+
+      <!-- Stats Grid -->
+      <section class="stats-section">
+        <h2 class="section-title">System Metrics</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Total Agents</span>
+            <span class="stat-value" id="statAgents">--</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Active Sessions</span>
+            <span class="stat-value" id="statSessions">--</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Message Events</span>
+            <span class="stat-value" id="statEvents">--</span>
+          </div>
+          <div class="stat-card span-2">
+            <span class="stat-label">Database Location</span>
+            <span class="stat-value path-value" id="statDbPath">--</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Detailed Info Tables -->
+      <div class="info-split">
+        
+        <!-- Agents Registry -->
+        <section class="info-section">
+          <h2 class="section-title">Active Registry</h2>
+          <div class="table-container">
+            <table id="agentsTable">
+              <thead>
+                <tr>
+                  <th>Agent Name</th>
+                  <th>Description</th>
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="3" class="loading-cell">Querying registry...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Recent Activities -->
+        <section class="info-section">
+          <h2 class="section-title">Recent Chat Activity</h2>
+          <div class="table-container">
+            <table id="sessionsTable">
+              <thead>
+                <tr>
+                  <th>Session Title</th>
+                  <th>Agent</th>
+                  <th>Last Update</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="3" class="loading-cell">Loading sessions...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+</body>
+</html>

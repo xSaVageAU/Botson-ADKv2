@@ -46,10 +46,7 @@ func (c *chatSublauncher) SetupSubrouters(router *mux.Router, config *launcher.C
 		http.Redirect(w, r, pathPrefix, http.StatusFound)
 	})
 
-	// Redirect / to /chat/
-	router.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, pathPrefix, http.StatusFound)
-	})
+
 
 	// Serve the main chat HTML
 	rChat.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
