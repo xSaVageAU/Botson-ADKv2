@@ -17,7 +17,10 @@ import (
 	"google.golang.org/genai"
 
 	"google.golang.org/adk/v2/cmd/launcher"
-	"google.golang.org/adk/v2/cmd/launcher/prod"
+	"google.golang.org/adk/v2/cmd/launcher/universal"
+	"google.golang.org/adk/v2/cmd/launcher/web"
+	"google.golang.org/adk/v2/cmd/launcher/web/a2a"
+	"google.golang.org/adk/v2/cmd/launcher/web/api"
 	"google.golang.org/adk/v2/model/gemini"
 )
 
@@ -86,39 +89,22 @@ func main() {
 		AgentLoader:     loader,
 	}
 
-	prodLauncher := prod.NewLauncher()
+	customLauncher := universal.NewLauncher(
+		web.NewLauncher(
+			api.NewLauncher(),
+			chat.NewSublauncher(),
+			builder.NewSublauncher(),
+			a2a.NewLauncher(),
+		),
+	)
 
-	// 1. Start the Agent Builder background service (port :8081)
-	go func() {
-		builderPort := os.Getenv("BUILDER_PORT")
-		if builderPort == "" {
-			builderPort = ":8081"
-		}
-		log.Printf("Starting Agent Builder background service on http://localhost%s\n", builderPort)
-		if err := builder.StartServerGracefully(ctx, builderPort); err != nil {
-			log.Printf("Agent Builder background service error: %v\n", err)
-		}
-	}()
-
-	// 2. Start the Custom Chat background service (port :8082)
-	go func() {
-		chatPort := os.Getenv("CHAT_PORT")
-		if chatPort == "" {
-			chatPort = ":8082"
-		}
-		log.Printf("Starting Custom Chat Interface background service on http://localhost%s\n", chatPort)
-		if err := chat.StartServerGracefully(ctx, chatPort); err != nil {
-			log.Printf("Custom Chat Interface background service error: %v\n", err)
-		}
-	}()
-
-	// 3. Execute the Production ADK REST API (port :8080)
-	fmt.Println("Starting production services... please do not close this window.")
+	// Execute the Unified REST & UI Web server (port :8080 by default)
+	fmt.Println("Starting unified production server... please do not close this window.")
 	
-	// Pass arguments to Execute: "api" launches REST API, and we set -webui_address to allow chat UI requests
-	args := []string{"api", "-webui_address", "http://localhost:8082"}
+	// Pass arguments to Execute: "web" triggers the web launcher, which boots all registered sublaunchers
+	args := []string{"web", "api", "chat", "builder"}
 	
-	if err = prodLauncher.Execute(ctx, configLauncher, args); err != nil {
+	if err = customLauncher.Execute(ctx, configLauncher, args); err != nil {
 		if ctx.Err() != nil {
 			log.Println("Server stopped gracefully via signal.")
 		} else {

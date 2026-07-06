@@ -5,7 +5,6 @@ import (
 	coreartifact "botsonv2/core/artifact"
 	"botsonv2/core/config"
 	coresession "botsonv2/core/session"
-	"botsonv2/core/webui/builder"
 	"context"
 	"fmt"
 	"log"
@@ -16,9 +15,7 @@ import (
 	"google.golang.org/genai"
 
 	"google.golang.org/adk/v2/cmd/launcher"
-	"google.golang.org/adk/v2/cmd/launcher/web"
-	"google.golang.org/adk/v2/cmd/launcher/web/api"
-	"google.golang.org/adk/v2/cmd/launcher/web/webui"
+	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
 )
 
@@ -87,33 +84,14 @@ func main() {
 		AgentLoader:     loader,
 	}
 
-	webLauncher := web.NewLauncher(
-		webui.NewLauncher(),
-		api.NewLauncher(),
-	)
+	adkLauncher := full.NewLauncher()
 
-	_, err = webLauncher.Parse([]string{"webui", "api"})
-	if err != nil {
-		log.Printf("Failed to initialize web launchers: %v", err)
-		fmt.Println("Press Enter to exit...")
-		fmt.Scanln()
-		os.Exit(1)
-	}
+	fmt.Println("Starting standard ADK Console/Web UI server... please do not close this window.")
+	
+	// Pass standard arguments to boot the default web console and REST API
+	args := []string{"web", "api", "webui"}
 
-	// Start the Agent Builder background service
-	go func() {
-		builderPort := os.Getenv("BUILDER_PORT")
-		if builderPort == "" {
-			builderPort = ":8081"
-		}
-		log.Printf("Starting Agent Builder background service on http://localhost%s\n", builderPort)
-		if err := builder.StartServerGracefully(ctx, builderPort); err != nil {
-			log.Printf("Agent Builder background service error: %v\n", err)
-		}
-	}()
-
-	fmt.Println("Starting server... please do not close this window.")
-	if err = webLauncher.Run(ctx, configLauncher); err != nil {
+	if err = adkLauncher.Execute(ctx, configLauncher, args); err != nil {
 		if ctx.Err() != nil {
 			log.Println("Server stopped gracefully via signal.")
 		} else {

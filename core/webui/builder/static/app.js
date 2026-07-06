@@ -10,7 +10,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAgents() {
   try {
-    const res = await fetch('/api/agents');
+    const res = await fetch('/builder/api/agents');
     if (!res.ok) throw new Error('Failed to load agents list');
     allAgents = await res.json();
     renderSidebar();
@@ -21,7 +21,7 @@ async function loadAgents() {
 
 async function loadTools() {
   try {
-    const res = await fetch('/api/tools');
+    const res = await fetch('/builder/api/tools');
     if (!res.ok) throw new Error('Failed to load tools list');
     allTools = await res.json();
   } catch (err) {
@@ -238,7 +238,7 @@ async function saveAgent() {
   };
 
   try {
-    const res = await fetch('/api/agents', {
+    const res = await fetch('/builder/api/agents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -270,7 +270,7 @@ async function deleteAgent(event, name) {
   }
 
   try {
-    const res = await fetch(`/api/agents/${name}`, {
+    const res = await fetch(`/builder/api/agents/${name}`, {
       method: 'DELETE'
     });
 

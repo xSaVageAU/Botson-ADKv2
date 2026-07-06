@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = '/api';
 let activeAgent = null;
 let activeSessionId = null;
 let isNewSession = false;
