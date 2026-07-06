@@ -208,11 +208,8 @@ async function deleteSession(event, sessionId) {
 async function startNewSession() {
   if (!activeAgent) return;
 
-  // Generate a random session ID
-  const sessionId = 'session-' + Math.random().toString(36).substring(2, 10);
-  
   try {
-    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions/${sessionId}`, {
+    const res = await fetch(`${API_BASE}/apps/${activeAgent}/users/user/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: {}, events: [] })
