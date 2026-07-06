@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"google.golang.org/genai"
 
@@ -21,7 +23,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// Load Configuration
 	appConfig, err := config.Load()
@@ -104,16 +107,20 @@ func main() {
 			builderPort = ":8081"
 		}
 		log.Printf("Starting Agent Builder background service on http://localhost%s\n", builderPort)
-		if err := builder.StartServer(builderPort); err != nil {
-			log.Printf("Agent Builder background service failed to run: %v\n", err)
+		if err := builder.StartServerGracefully(ctx, builderPort); err != nil {
+			log.Printf("Agent Builder background service error: %v\n", err)
 		}
 	}()
 
 	fmt.Println("Starting server... please do not close this window.")
 	if err = webLauncher.Run(ctx, configLauncher); err != nil {
-		log.Printf("Web server execution failed: %v", err)
-		fmt.Println("Press Enter to exit...")
-		fmt.Scanln()
-		os.Exit(1)
+		if ctx.Err() != nil {
+			log.Println("Server stopped gracefully via signal.")
+		} else {
+			log.Printf("Web server execution failed: %v\n", err)
+			fmt.Println("Press Enter to exit...")
+			fmt.Scanln()
+			os.Exit(1)
+		}
 	}
 }

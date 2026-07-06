@@ -2,15 +2,18 @@ package builder
 
 import (
 	"botsonv2/core/agent"
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 //go:embed index.html static/*
@@ -189,4 +192,35 @@ func NewHandler() http.Handler {
 func StartServer(port string) error {
 	handler := NewHandler()
 	return http.ListenAndServe(port, handler)
+}
+
+// StartServerGracefully starts the Agent Builder server and shuts it down when the context is cancelled.
+func StartServerGracefully(ctx context.Context, port string) error {
+	handler := NewHandler()
+	srv := &http.Server{
+		Addr:    port,
+		Handler: handler,
+	}
+
+	errChan := make(chan error, 1)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			errChan <- err
+		}
+		close(errChan)
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Println("Shutting down Agent Builder server gracefully...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("agent builder shutdown failed: %w", err)
+		}
+		return nil
+	case err := <-errChan:
+		return err
+	}
 }
