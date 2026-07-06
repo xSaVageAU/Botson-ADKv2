@@ -1,6 +1,6 @@
 // Agent Builder Config View Controller
 
-window.loadAgentsForBuilder = async function() {
+window.loadAgentsForBuilder = async function () {
   try {
     const res = await fetch('/botson/api/agents');
     if (!res.ok) throw new Error('Failed to load agents list');
@@ -11,7 +11,7 @@ window.loadAgentsForBuilder = async function() {
   }
 };
 
-window.loadToolsForBuilder = async function() {
+window.loadToolsForBuilder = async function () {
   try {
     const res = await fetch('/botson/api/tools');
     if (!res.ok) throw new Error('Failed to load tools list');
@@ -21,7 +21,7 @@ window.loadToolsForBuilder = async function() {
   }
 };
 
-window.renderBuilderSidebar = function() {
+window.renderBuilderSidebar = function () {
   const listEl = document.getElementById('agentList');
   const countEl = document.getElementById('agentCount');
   if (!listEl) return;
@@ -54,10 +54,10 @@ window.renderBuilderSidebar = function() {
   });
 };
 
-window.selectAgent = function(agent) {
+window.selectAgent = function (agent) {
   window.currentAgent = agent;
   window.renderBuilderSidebar();
-  
+
   const welcome = document.getElementById('builder-welcome');
   if (welcome) welcome.style.display = 'none';
   const editor = document.getElementById('builder-editor');
@@ -67,10 +67,10 @@ window.selectAgent = function(agent) {
   }
 };
 
-window.openNewAgentForm = function() {
+window.openNewAgentForm = function () {
   window.currentAgent = null;
   window.renderBuilderSidebar();
-  
+
   const welcome = document.getElementById('builder-welcome');
   if (welcome) welcome.style.display = 'none';
   const editor = document.getElementById('builder-editor');
@@ -88,7 +88,7 @@ window.openNewAgentForm = function() {
   }
 };
 
-window.renderForm = function(agentData) {
+window.renderForm = function (agentData) {
   const isEdit = agentData.name !== '';
   const editor = document.getElementById('builder-editor');
   if (!editor) return;
@@ -104,14 +104,14 @@ window.renderForm = function(agentData) {
       <span class="group-title">Standard tools</span>
       <div class="tools-container">
         ${window.allTools.standard.map(tool => {
-          const checked = agentData.tools && agentData.tools.includes(tool) ? 'checked' : '';
-          return `
+    const checked = agentData.tools && agentData.tools.includes(tool) ? 'checked' : '';
+    return `
             <label class="tool-item">
               <input type="checkbox" name="tools" value="${window.escapeHtml(tool)}" ${checked} onchange="window.updateWiringStrip()">
               <span>${window.escapeHtml(tool)}</span>
             </label>
           `;
-        }).join('')}
+  }).join('')}
       </div>
     </div>
   `;
@@ -122,14 +122,14 @@ window.renderForm = function(agentData) {
         <span class="group-title">Sub-agent delegation</span>
         <div class="tools-container">
           ${filteredSubagents.map(subName => {
-            const checked = agentData.tools && agentData.tools.includes(subName) ? 'checked' : '';
-            return `
+      const checked = agentData.tools && agentData.tools.includes(subName) ? 'checked' : '';
+      return `
               <label class="tool-item">
                 <input type="checkbox" name="tools" value="${window.escapeHtml(subName)}" ${checked} onchange="window.updateWiringStrip()">
                 <span>${window.escapeHtml(subName)}</span>
               </label>
             `;
-          }).join('')}
+    }).join('')}
         </div>
       </div>
     `;
@@ -177,7 +177,7 @@ window.renderForm = function(agentData) {
     <div class="field-row">
       <div class="field">
         <label for="agentNameInput">Agent Unique Name</label>
-        <input type="text" id="agentNameInput" value="${window.escapeHtml(agentData.name)}" ${isEdit ? 'disabled' : ''} placeholder="e.g. general_assistant" oninput="window.handleNameInput(this)">
+        <input type="text" id="agentNameInput" value="${window.escapeHtml(agentData.name)}" ${isEdit ? 'disabled' : ''} placeholder="e.g. Agent Botson" oninput="window.handleNameInput(this)">
       </div>
       <div class="field">
         <label for="agentDescInput">Short Description</label>
@@ -185,12 +185,11 @@ window.renderForm = function(agentData) {
       </div>
     </div>
 
-    <div class="switch-row">
-      <label class="builder-switch">
-        <input type="checkbox" id="agentRootInput" ${agentData.is_root ? 'checked' : ''}>
-        <span>Is Root (Entry point)</span>
-      </label>
+    ${agentData.is_root ? `
+    <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 18px; background: rgba(16, 185, 129, 0.05); color: var(--green); font-size: 13.5px; font-weight: 500;">
+      <span>⭐ Default Root Agent (Entry Point)</span>
     </div>
+    ` : ''}
 
     <div class="field" style="margin-bottom: 16px;">
       <label for="agentPromptInput">System Instructions / Prompt</label>
@@ -206,7 +205,7 @@ window.renderForm = function(agentData) {
   `;
 };
 
-window.handleNameInput = function(el) {
+window.handleNameInput = function (el) {
   const val = el.value.trim();
   const heading = document.getElementById('headingName');
   const strip = document.getElementById('stripName');
@@ -214,18 +213,18 @@ window.handleNameInput = function(el) {
   if (strip) strip.textContent = val || 'new_agent';
 };
 
-window.updateWiringStrip = function() {
+window.updateWiringStrip = function () {
   const checkedCheckboxes = Array.from(document.querySelectorAll('input[name="tools"]:checked')).map(cb => cb.value);
   const toolCount = checkedCheckboxes.filter(t => window.allTools.standard.includes(t)).length;
   const subCount = checkedCheckboxes.filter(t => window.allTools.agents.includes(t)).length;
-  
+
   const stripTool = document.getElementById('stripToolCount');
   const stripSub = document.getElementById('stripSubCount');
   if (stripTool) stripTool.textContent = toolCount;
   if (stripSub) stripSub.textContent = subCount;
 };
 
-window.cancelEditor = function() {
+window.cancelEditor = function () {
   window.currentAgent = null;
   window.renderBuilderSidebar();
   const editor = document.getElementById('builder-editor');
@@ -234,12 +233,12 @@ window.cancelEditor = function() {
   if (welcome) welcome.style.display = 'block';
 };
 
-window.saveAgent = async function() {
+window.saveAgent = async function () {
   const nameInput = document.getElementById('agentNameInput');
   const descInput = document.getElementById('agentDescInput');
   const isRootInput = document.getElementById('agentRootInput');
   const promptInput = document.getElementById('agentPromptInput');
-  
+
   if (!nameInput) return;
   const name = nameInput.value.trim();
   if (!name) {
@@ -257,7 +256,6 @@ window.saveAgent = async function() {
     agentConfig: {
       name: name,
       description: descInput ? descInput.value.trim() : '',
-      is_root: isRootInput ? isRootInput.checked : false,
       tools: selectedTools,
     }
   };
@@ -282,7 +280,7 @@ window.saveAgent = async function() {
   }
 };
 
-window.deleteAgent = async function(event, agentName) {
+window.deleteAgent = async function (event, agentName) {
   event.stopPropagation();
   if (!confirm(`Are you sure you want to delete agent "${agentName}"?`)) return;
 

@@ -23,7 +23,7 @@ import (
 type AgentConfig struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
-	IsRoot      bool     `json:"is_root"`
+	IsRoot      bool     `json:"is_root,omitempty"`
 	Private     bool     `json:"private"`
 	Tools       []string `json:"tools"`
 }
@@ -201,7 +201,7 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 
 	// 4. Find root agent and compile otherAgents list (filtering out private agents)
 	appConfig, errCfg := config.Load()
-	rootAgentName := "general_assistant"
+	rootAgentName := "Agent Botson"
 	if errCfg == nil && appConfig.RootAgent != "" {
 		rootAgentName = appConfig.RootAgent
 	}
@@ -281,7 +281,7 @@ func GetAgentDetails(embeddedFS fs.FS) ([]AgentDetail, error) {
 
 	// 3. Assemble results list
 	appConfig, _ := config.Load()
-	rootAgentName := "general_assistant"
+	rootAgentName := "Agent Botson"
 	if appConfig != nil && appConfig.RootAgent != "" {
 		rootAgentName = appConfig.RootAgent
 	}
@@ -337,4 +337,3 @@ func resolvePlaceholders(prompt string) string {
 
 	return prompt
 }
-

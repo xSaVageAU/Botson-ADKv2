@@ -16,7 +16,7 @@ import (
 	"google.golang.org/adk/v2/server/adkrest/controllers"
 )
 
-var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9_ -]+$`)
 
 func registerBuilderRoutes(r *mux.Router) {
 	// GET /botson/api/agents - returns list of all agents
@@ -46,7 +46,7 @@ func registerBuilderRoutes(r *mux.Router) {
 
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" || !nameRegex.MatchString(req.Name) {
-			http.Error(w, "invalid agent name: must contain only alphanumeric characters, underscores, and dashes", http.StatusBadRequest)
+			http.Error(w, "invalid agent name: must contain only alphanumeric characters, spaces, underscores, and dashes", http.StatusBadRequest)
 			return
 		}
 

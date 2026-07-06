@@ -46,7 +46,7 @@ func Load() (*AppConfig, error) {
 			// Return a default configuration template
 			defaultCfg := &AppConfig{
 				ModelName: "gemini-3.1-flash-lite",
-				RootAgent: "general_assistant",
+				RootAgent: "Agent Botson",
 			}
 			// Bootstrap the config file so it physically exists
 			_ = Save(defaultCfg)

@@ -1,7 +1,6 @@
 {
-  "name": "general_assistant",
+  "name": "Agent Botson",
   "description": "A general-purpose AI assistant designed to help with development tasks and project management.",
-  "is_root": true,
   "tools": [
     "listFiles",
     "readFile",
