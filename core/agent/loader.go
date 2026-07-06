@@ -200,19 +200,21 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 	}
 
 	// 4. Find root agent and compile otherAgents list (filtering out private agents)
+	appConfig, errCfg := config.Load()
+	rootAgentName := "general_assistant"
+	if errCfg == nil && appConfig.RootAgent != "" {
+		rootAgentName = appConfig.RootAgent
+	}
+
 	var rootAgent adkagent.Agent
 	var otherAgents []adkagent.Agent
 
-	// Look for explicitly marked is_root
-	for _, loaded := range built {
-		if loaded.IsRoot {
-			rootAgent = loaded.Agent
-		} else if !loaded.Private {
-			otherAgents = append(otherAgents, loaded.Agent)
-		}
+	// Look for configured root agent
+	if loaded, ok := built[rootAgentName]; ok {
+		rootAgent = loaded.Agent
 	}
 
-	// If no root is explicitly marked, fall back to the first non-private agent
+	// Fallback if not found
 	if rootAgent == nil {
 		for _, loaded := range built {
 			if !loaded.Private {
@@ -220,19 +222,18 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 				break
 			}
 		}
-		// If still nil, fall back to the first agent regardless of privacy
 		if rootAgent == nil {
 			for _, loaded := range built {
 				rootAgent = loaded.Agent
 				break
 			}
 		}
-		// Rebuild otherAgents list excluding the root and private agents
-		otherAgents = nil
-		for _, loaded := range built {
-			if loaded.Agent != rootAgent && !loaded.Private {
-				otherAgents = append(otherAgents, loaded.Agent)
-			}
+	}
+
+	// Build otherAgents list excluding the resolved root
+	for _, loaded := range built {
+		if loaded.Agent != rootAgent && !loaded.Private {
+			otherAgents = append(otherAgents, loaded.Agent)
 		}
 	}
 
@@ -279,8 +280,15 @@ func GetAgentDetails(embeddedFS fs.FS) ([]AgentDetail, error) {
 	}
 
 	// 3. Assemble results list
+	appConfig, _ := config.Load()
+	rootAgentName := "general_assistant"
+	if appConfig != nil && appConfig.RootAgent != "" {
+		rootAgentName = appConfig.RootAgent
+	}
+
 	var details []AgentDetail
 	for name, cfg := range configs {
+		cfg.IsRoot = (name == rootAgentName) // Resolve root state dynamically
 		details = append(details, AgentDetail{
 			AgentConfig:  *cfg,
 			Instructions: instructions[name],

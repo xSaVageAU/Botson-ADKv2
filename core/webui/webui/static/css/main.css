@@ -565,7 +565,8 @@ select option {
 }
 
 .form-group input[type="text"],
-.form-group input[type="password"] {
+.form-group input[type="password"],
+.form-group select {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -577,7 +578,13 @@ select option {
   transition: all 0.2s ease;
 }
 
-.form-group input:focus {
+.form-group select {
+  cursor: pointer;
+  width: 100%;
+}
+
+.form-group input:focus,
+.form-group select:focus {
   border-color: var(--accent-light);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }

@@ -214,6 +214,31 @@ window.loadSettings = async function() {
     
     // Populate Access Control lists
     await window.renderAccessControl(window.currentWhitelist);
+    
+    // Fetch stats to get all available agent names
+    try {
+      const statsRes = await fetch('/botson/api/stats');
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        const rootAgentSelect = document.getElementById('rootAgentSelect');
+        if (rootAgentSelect) {
+          rootAgentSelect.innerHTML = '';
+          if (stats.agents) {
+            stats.agents.forEach(ag => {
+              const opt = document.createElement('option');
+              opt.value = ag.name;
+              opt.textContent = ag.name;
+              if (ag.name === cfg.root_agent) {
+                opt.selected = true;
+              }
+              rootAgentSelect.appendChild(opt);
+            });
+          }
+        }
+      }
+    } catch (statsErr) {
+      console.error('Failed to load agents list for root select:', statsErr);
+    }
   } catch (err) {
     window.showToast('Failed to load configuration settings', 'error');
   }
@@ -330,6 +355,7 @@ window.saveSettings = async function(event) {
   const payload = {
     model_name: "gemini-3.1-flash-lite", // Retain standard model default
     gemini_api_key: document.getElementById('geminiApiKeyInput').value.trim(),
+    root_agent: document.getElementById('rootAgentSelect') ? document.getElementById('rootAgentSelect').value : "general_assistant",
     discord: {
       enabled: document.getElementById('discordEnabledInput').checked,
       token: document.getElementById('discordTokenInput').value.trim(),

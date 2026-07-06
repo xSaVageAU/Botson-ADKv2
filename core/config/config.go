@@ -11,6 +11,7 @@ import (
 type AppConfig struct {
 	ModelName    string        `json:"model_name"`
 	GeminiAPIKey string        `json:"gemini_api_key"`
+	RootAgent    string        `json:"root_agent"`
 	Discord      DiscordConfig `json:"discord"`
 }
 
@@ -45,6 +46,7 @@ func Load() (*AppConfig, error) {
 			// Return a default configuration template
 			defaultCfg := &AppConfig{
 				ModelName: "gemini-3.1-flash-lite",
+				RootAgent: "general_assistant",
 			}
 			// Bootstrap the config file so it physically exists
 			_ = Save(defaultCfg)
