@@ -171,7 +171,18 @@ func (g *Gateway) handleInteraction(s *discordgo.Session, i *discordgo.Interacti
 	}
 
 	cmdName := i.ApplicationCommandData().Name
-	userID := i.Member.User.ID
+
+	var user *discordgo.User
+	if i.Member != nil {
+		user = i.Member.User
+	} else {
+		user = i.User
+	}
+
+	if user == nil {
+		return
+	}
+	userID := user.ID
 
 	if cmdName == "approve" {
 		g.executeApproveCommand(s, i)
@@ -180,7 +191,7 @@ func (g *Gateway) handleInteraction(s *discordgo.Session, i *discordgo.Interacti
 
 	// Check whitelisting authorization gate
 	if !g.isAuthorized(userID, i.Member) {
-		code := GetManager().AddPendingRequest(userID, i.Member.User.Username, i.ChannelID)
+		code := GetManager().AddPendingRequest(userID, user.Username, i.ChannelID)
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -240,8 +251,16 @@ func (g *Gateway) executeApproveCommand(s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 
-	isOwner := cfg.Discord.OwnerID != "" && i.Member.User.ID == cfg.Discord.OwnerID
-	isAdmin := i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	var executingUserID string
+	isAdmin := false
+	if i.Member != nil {
+		executingUserID = i.Member.User.ID
+		isAdmin = i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	} else if i.User != nil {
+		executingUserID = i.User.ID
+	}
+
+	isOwner := cfg.Discord.OwnerID != "" && executingUserID == cfg.Discord.OwnerID
 	if !isOwner && !isAdmin {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -298,7 +317,13 @@ func (g *Gateway) executeApproveCommand(s *discordgo.Session, i *discordgo.Inter
 
 func (g *Gateway) executeNewCommand(s *discordgo.Session, i *discordgo.InteractionCreate, ctx context.Context, agentName string) {
 	channelID := i.ChannelID
-	channelName := g.getChannelName(s, channelID, i.Member)
+	var user *discordgo.User
+	if i.Member != nil {
+		user = i.Member.User
+	} else {
+		user = i.User
+	}
+	channelName := g.getChannelName(s, channelID, user)
 
 	g.mu.RLock()
 	oldSessionID := g.activeSessions[channelID]
@@ -682,15 +707,15 @@ func (g *Gateway) getChannelSessions(ctx context.Context, channelID, agentName s
 	return results, nil
 }
 
-func (g *Gateway) getChannelName(s *discordgo.Session, channelID string, member *discordgo.Member) string {
+func (g *Gateway) getChannelName(s *discordgo.Session, channelID string, user *discordgo.User) string {
 	if s != nil {
 		channel, err := s.Channel(channelID)
 		if err == nil && channel != nil && channel.Name != "" {
 			return channel.Name
 		}
 	}
-	if member != nil && member.User != nil {
-		return "DM with @" + member.User.Username
+	if user != nil {
+		return "DM with @" + user.Username
 	}
 	return channelID
 }
