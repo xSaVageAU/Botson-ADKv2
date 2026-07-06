@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Botson ADK — Custom Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Sidebar / Navigation and Session details -->
+    <aside class="rail">
+      <div class="rail-head">
+        <span class="mark" aria-hidden="true">⌁</span>
+        <div class="brand">
+          <span class="brand-name">BOTSON</span>
+          <span class="brand-sub">custom chat</span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom: 16px;">
+        <label for="agentSelector">Active Agent</label>
+        <select id="agentSelector" onchange="switchAgent()">
+          <!-- Populated by app.js -->
+        </select>
+      </div>
+
+      <button class="btn-new" onclick="startNewSession()">
+        <span class="plus" aria-hidden="true">⟳</span> Restart Chat
+      </button>
+
+      <div class="rail-list-head">
+        <span>Session State</span>
+      </div>
+      
+      <div class="state-inspector" id="stateInspector">
+        <!-- Rendered as syntax-highlighted json representation of state -->
+        <span class="empty-state">No state keys loaded</span>
+      </div>
+
+      <div class="rail-foot">
+        connected to ADK API <code>:8080</code>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main id="chatWorkspace">
+      <header class="chat-header">
+        <div>
+          <span class="eyebrow" id="activeAgentSub">AGENT</span>
+          <h3 id="activeAgentName">No Agent Selected</h3>
+        </div>
+        <span class="pill pill-accent" id="sessionPill">no session</span>
+      </header>
+
+      <div class="chat-log" id="chatLog">
+        <div class="welcome-message">
+          <h2>Welcome to Botson Custom Chat</h2>
+          <p>Choose an agent from the dropdown on the left to start a dynamic chat thread. Any tool executions or background agent reasoning will render inline in real-time!</p>
+        </div>
+      </div>
+
+      <!-- Typing Indicator -->
+      <div class="typing-indicator" id="typingIndicator">
+        <span class="indicator-dot"></span>
+        <span class="indicator-dot"></span>
+        <span class="indicator-dot"></span>
+        <span class="indicator-text">Agent is thinking...</span>
+      </div>
+
+      <!-- Input area -->
+      <div class="chat-input-bar">
+        <textarea id="messageInput" placeholder="Type a message... (Ctrl+Enter to send)" onkeydown="handleInputKey(event)"></textarea>
+        <button class="btn btn-primary btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-rack" id="toastContainer"></div>
+</body>
+</html>
