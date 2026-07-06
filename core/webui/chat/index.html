@@ -13,7 +13,7 @@
 <body>
   <div class="app-shell">
 
-    <!-- Sidebar / Navigation and Session details -->
+    <!-- Left Sidebar: Agent choice and Session List -->
     <aside class="rail">
       <div class="rail-head">
         <span class="mark" aria-hidden="true">⌁</span>
@@ -31,17 +31,17 @@
       </div>
 
       <button class="btn-new" onclick="startNewSession()">
-        <span class="plus" aria-hidden="true">⟳</span> Restart Chat
+        <span class="plus" aria-hidden="true">+</span> New Chat
       </button>
 
       <div class="rail-list-head">
-        <span>Session State</span>
+        <span>Chat Sessions</span>
+        <span class="rail-list-count" id="sessionCount">0</span>
       </div>
       
-      <div class="state-inspector" id="stateInspector">
-        <!-- Rendered as syntax-highlighted json representation of state -->
-        <span class="empty-state">No state keys loaded</span>
-      </div>
+      <ul class="session-list" id="sessionList">
+        <!-- Populated by app.js -->
+      </ul>
 
       <div class="rail-foot">
         connected to ADK API <code>:8080</code>
@@ -55,7 +55,10 @@
           <span class="eyebrow" id="activeAgentSub">AGENT</span>
           <h3 id="activeAgentName">No Agent Selected</h3>
         </div>
-        <span class="pill pill-accent" id="sessionPill">no session</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="pill pill-accent" id="sessionPill">no session</span>
+          <button class="btn btn-secondary" onclick="toggleInspector()">⚙ Inspect</button>
+        </div>
       </header>
 
       <div class="chat-log" id="chatLog">
@@ -79,6 +82,51 @@
         <button class="btn btn-primary btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
       </div>
     </main>
+
+    <!-- Right Collapsible Inspector Panel -->
+    <aside class="inspector-drawer" id="inspectorDrawer">
+      <div class="drawer-header">
+        <h4>Session Inspector</h4>
+        <button class="btn-close-drawer" onclick="toggleInspector()">✕</button>
+      </div>
+
+      <!-- Tabs Navigation -->
+      <div class="drawer-tabs">
+        <button class="tab-btn active" onclick="switchTab(event, 'state')">State</button>
+        <button class="tab-btn" onclick="switchTab(event, 'artifacts')">Artifacts</button>
+        <button class="tab-btn" onclick="switchTab(event, 'telemetry')">Telemetry</button>
+      </div>
+
+      <!-- Tab Content: State -->
+      <div class="tab-content active" id="tab-state">
+        <div class="state-inspector" id="stateInspector">
+          <span class="empty-state">No state keys loaded</span>
+        </div>
+      </div>
+
+      <!-- Tab Content: Artifacts -->
+      <div class="tab-content" id="tab-artifacts">
+        <ul class="artifact-list" id="artifactList">
+          <!-- Populated by app.js -->
+        </ul>
+        <div class="artifact-viewer" id="artifactViewer">
+          <div class="viewer-header">
+            <span class="viewer-title" id="artifactViewerTitle">No artifact loaded</span>
+            <span class="viewer-version" id="artifactViewerVersion"></span>
+          </div>
+          <pre class="viewer-code" id="artifactViewerCode"><span class="empty-state">Select an artifact to preview its content</span></pre>
+        </div>
+      </div>
+
+      <!-- Tab Content: Telemetry -->
+      <div class="tab-content" id="tab-telemetry">
+        <div class="telemetry-timeline" id="telemetryTimeline">
+          <!-- Populated by app.js -->
+          <span class="empty-state">No telemetry data captured</span>
+        </div>
+      </div>
+    </aside>
+
   </div>
 
   <div class="toast-rack" id="toastContainer"></div>
