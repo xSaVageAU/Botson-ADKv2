@@ -45,12 +45,12 @@ func (b *builderSublauncher) SimpleDescription() string {
 func (b *builderSublauncher) SetupSubrouters(router *mux.Router, config *launcher.Config) error {
 	pathPrefix := "/builder/"
 
+	rBuilder := router.Methods("GET").PathPrefix(pathPrefix).Subrouter()
+
 	// Redirect /builder to /builder/
 	router.Methods("GET").Path("/builder").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, pathPrefix, http.StatusFound)
 	})
-
-	rBuilder := router.Methods("GET").PathPrefix(pathPrefix).Subrouter()
 
 	// Serve the main builder HTML
 	rBuilder.Methods("GET").Path("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
