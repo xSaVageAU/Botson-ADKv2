@@ -56,11 +56,9 @@ type model struct {
 	streamingOutput strings.Builder
 
 	// Styles
-	titleStyle     lipgloss.Style
-	userStyle      lipgloss.Style
-	agentStyle     lipgloss.Style
-	toolStyle      lipgloss.Style
-	containerStyle lipgloss.Style
+	userStyle  lipgloss.Style
+	agentStyle lipgloss.Style
+	toolStyle  lipgloss.Style
 }
 
 func main() {
@@ -191,7 +189,7 @@ func initialModel(r *runner.Runner, sessionID, agentName string) model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	vp := viewport.New(80, 20)
-	vp.SetContent("Welcome to Botson TUI! Chatting with Agent: " + agentName + "\n\n")
+	vp.SetContent("")
 
 	return model{
 		viewport:   vp,
@@ -200,14 +198,9 @@ func initialModel(r *runner.Runner, sessionID, agentName string) model {
 		runner:     r,
 		sessionID:  sessionID,
 		agentName:  agentName,
-		titleStyle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86")).Border(lipgloss.NormalBorder(), false, false, true, false).BorderForeground(lipgloss.Color("86")).PaddingBottom(1),
 		userStyle:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")),
 		agentStyle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")),
 		toolStyle:  lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("208")),
-		containerStyle: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(1, 2),
 	}
 }
 
@@ -228,14 +221,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Compute border margins for viewport resize
-		headerHeight := 3
-		inputHeight := 3
-		borderMargins := 4
-		m.viewport.Width = msg.Width - borderMargins - 4
-		m.viewport.Height = msg.Height - headerHeight - inputHeight - borderMargins
+		m.viewport.Width = msg.Width
+		m.viewport.Height = msg.Height - 3
 
-		m.textInput.Width = msg.Width - borderMargins - 10
+		m.textInput.Width = msg.Width - 10
 		m.viewport.SetContent(m.renderHistory())
 		m.viewport.GotoBottom()
 
@@ -361,9 +350,6 @@ func (m model) renderHistory() string {
 func (m model) View() string {
 	var sb strings.Builder
 
-	// Header Title
-	sb.WriteString(m.titleStyle.Render(fmt.Sprintf("BOTSON TERMINAL CONSOLE  |  Agent: %s", m.agentName)) + "\n\n")
-
 	// Viewport Content
 	sb.WriteString(m.viewport.View() + "\n\n")
 
@@ -374,8 +360,7 @@ func (m model) View() string {
 		sb.WriteString(m.textInput.View())
 	}
 
-	// AltScreen Container
-	return m.containerStyle.Width(m.width - 6).Render(sb.String())
+	return sb.String()
 }
 
 func silenceGormLogger(service interface{}) {
