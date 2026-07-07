@@ -343,16 +343,16 @@
 
             <div class="editor-container" id="workflow-editor" style="display: none; height: 100%; display: flex; flex-direction: column; position: relative;">
               <!-- Header / Actions -->
-              <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); z-index: 10;">
-                <div style="display: flex; gap: 12px; align-items: center;">
-                  <input type="text" id="workflowNameInput" placeholder="Workflow Name" style="font-size: 16px; font-weight: 600; background: transparent; border: none; outline: none; border-bottom: 1px dashed var(--border); color: var(--text); padding: 4px;">
-                  <input type="text" id="workflowDescInput" placeholder="Short description..." style="font-size: 13px; color: var(--text-muted); background: transparent; border: none; outline: none; width: 300px; border-bottom: 1px dashed var(--border); padding: 4px;">
+              <div class="wf-editor-header">
+                <div class="wf-title-group">
+                  <input type="text" id="workflowNameInput" placeholder="Workflow Name" class="wf-name-input">
+                  <input type="text" id="workflowDescInput" placeholder="Short description..." class="wf-desc-input">
                 </div>
-                <div style="display: flex; gap: 8px;">
-                  <button class="btn btn-secondary" onclick="window.addNodeToCanvas('agent')">+ Add Agent Node</button>
-                  <button class="btn btn-secondary" onclick="window.addNodeToCanvas('tool')">+ Add Tool Node</button>
-                  <button class="btn btn-primary" onclick="window.saveWorkflow()">Save Workflow</button>
-                  <button class="btn btn-danger" onclick="window.deleteWorkflow()" style="background: var(--danger); border: none; color: white;">Delete</button>
+                <div class="wf-header-actions">
+                  <button class="wf-btn" onclick="window.addNodeToCanvas('agent')">+ Add Agent Node</button>
+                  <button class="wf-btn" onclick="window.addNodeToCanvas('tool')">+ Add Tool Node</button>
+                  <button class="wf-btn wf-btn-primary" onclick="window.saveWorkflow()">Save Workflow</button>
+                  <button class="wf-btn wf-btn-danger" onclick="window.deleteWorkflow()">Delete</button>
                 </div>
               </div>
 
@@ -367,12 +367,12 @@
               </div>
 
               <!-- Inspector Panel (Side drawer) -->
-              <div id="nodeInspector" style="position: absolute; right: 0; top: 58px; bottom: 0; width: 300px; background: var(--panel); border-left: 1px solid var(--border); box-shadow: var(--shadow); z-index: 20; display: none; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <h3 id="inspectorNodeTitle" style="margin: 0;">Configure Node</h3>
-                  <button class="btn btn-secondary" onclick="window.closeInspector()" style="padding: 4px 8px; font-size: 11px;">Close</button>
+              <div id="nodeInspector" class="node-inspector" style="display: none;">
+                <div class="inspector-header">
+                  <h3 id="inspectorNodeTitle" class="inspector-title">Configure Node</h3>
+                  <button class="inspector-close-btn" onclick="window.closeInspector()">Close</button>
                 </div>
-                <hr style="border: none; border-top: 1px solid var(--border); margin: 0;">
+                <hr class="inspector-divider">
                 <div id="inspectorContent" style="display: flex; flex-direction: column; gap: 12px;">
                   <!-- Dynamic content (dropdowns etc.) -->
                 </div>
