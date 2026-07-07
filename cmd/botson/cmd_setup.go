@@ -16,7 +16,7 @@ func newSetupCmd() *cobra.Command {
 		Short:             "Install, uninstall, or reset this Botson installation",
 		PersistentPreRunE: noBootstrap,
 	}
-	cmd.AddCommand(newSetupInstallCmd(), newSetupUninstallCmd(), newSetupResetCmd())
+	cmd.AddCommand(newSetupInstallCmd(), newSetupUninstallCmd(), newSetupResetCmd(), newSetupStatusCmd())
 	return cmd
 }
 
@@ -49,6 +49,16 @@ func newSetupResetCmd() *cobra.Command {
 		Short: "Selectively reset configuration and/or session data, then reconfigure",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return setup.Reset(cmd.Context())
+		},
+	}
+}
+
+func newSetupStatusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show whether Botson is installed, on PATH, and which services are running",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return setup.Status(cmd.Context())
 		},
 	}
 }

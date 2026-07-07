@@ -27,3 +27,14 @@ func AddToPath(dir string) error {
 func RemoveFromPath(dir string) error {
 	return nil
 }
+
+// IsOnPath reports whether dir is currently present in $PATH -- used by
+// `setup status`.
+func IsOnPath(dir string) (bool, error) {
+	for _, p := range strings.Split(os.Getenv("PATH"), ":") {
+		if p == dir {
+			return true, nil
+		}
+	}
+	return false, nil
+}

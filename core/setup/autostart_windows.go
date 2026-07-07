@@ -27,6 +27,24 @@ func RegisterTrayAutostart(exePath string) error {
 	return nil
 }
 
+// IsTrayAutostartRegistered reports whether the Run key entry currently
+// exists, without modifying anything -- used by `setup status`.
+func IsTrayAutostartRegistered() (bool, error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, autostartKeyPath, registry.QUERY_VALUE)
+	if err != nil {
+		return false, fmt.Errorf("failed to open registry key: %w", err)
+	}
+	defer key.Close()
+
+	if _, _, err := key.GetStringValue(autostartValueName); err != nil {
+		if err == registry.ErrNotExist {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read autostart entry: %w", err)
+	}
+	return true, nil
+}
+
 // UnregisterTrayAutostart removes the Run key entry, if present.
 func UnregisterTrayAutostart() error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, autostartKeyPath, registry.SET_VALUE)

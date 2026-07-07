@@ -15,3 +15,9 @@ func RegisterTrayAutostart(exePath string) error {
 func UnregisterTrayAutostart() error {
 	return nil
 }
+
+// IsTrayAutostartRegistered always reports false on Linux since autostart
+// is never registered here -- used by `setup status`.
+func IsTrayAutostartRegistered() (bool, error) {
+	return false, nil
+}

@@ -111,6 +111,31 @@ func AddToPath(dir string) error {
 	return nil
 }
 
+// IsOnPath reports whether dir is currently present in the current user's
+// PATH, without modifying anything -- used by `setup status`.
+func IsOnPath(dir string) (bool, error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE)
+	if err != nil {
+		return false, fmt.Errorf("failed to open registry key: %w", err)
+	}
+	defer key.Close()
+
+	current, _, err := key.GetStringValue("Path")
+	if err != nil {
+		if err == registry.ErrNotExist {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read current PATH: %w", err)
+	}
+
+	for _, existing := range strings.Split(current, ";") {
+		if strings.EqualFold(strings.TrimSpace(existing), dir) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // RemoveFromPath removes dir from the current user's PATH, if present.
 func RemoveFromPath(dir string) error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE|registry.SET_VALUE)
