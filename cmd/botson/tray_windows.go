@@ -7,6 +7,8 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"botsonv2/core/daemon"
@@ -155,6 +157,8 @@ func onTrayReady() {
 	systray.SetIcon(trayIconData)
 	systray.SetTooltip("Botson background services")
 
+	mOpenChat := systray.AddMenuItem("Open Chat", "Open a new terminal chat session")
+	systray.AddSeparator()
 	traySvcDiscord.toggle = systray.AddMenuItem("Start Discord", "Start/stop the Discord gateway")
 	traySvcWeb.toggle = systray.AddMenuItem("Start Web", "Start/stop the web console")
 	systray.AddSeparator()
@@ -163,6 +167,11 @@ func onTrayReady() {
 
 	go trayPollLoop()
 
+	go func() {
+		for range mOpenChat.ClickedCh {
+			openChatWindow()
+		}
+	}()
 	go func() {
 		for range traySvcDiscord.toggle.ClickedCh {
 			toggleTrayService(traySvcDiscord)
@@ -183,6 +192,33 @@ func onTrayReady() {
 		_ = daemon.Stop(traySvcWeb.id, traySvcWeb.displayName, false)
 		systray.Quit()
 	}()
+}
+
+// CREATE_NO_WINDOW isn't exposed as a named constant in the syscall
+// package (same situation as DETACHED_PROCESS in core/daemon), so its
+// documented raw value is used directly here.
+const createNoWindow = 0x08000000
+
+// openChatWindow launches a new, visible console window running the TUI
+// chat client, via `cmd /C start` rather than spawning the exe directly
+// with CREATE_NEW_CONSOLE. exec.Command defaults Stdin/Stdout/Stderr to
+// the null device when left unset, and that override wins even over a
+// freshly allocated console -- the window appears but the process's I/O
+// is wired to nowhere, so it looks blank and doesn't respond to input.
+// `start` allocates the new console itself and connects the target
+// process's I/O to it properly. CREATE_NO_WINDOW here just hides the
+// momentary intermediate cmd.exe window; it has no effect on the new
+// console `start` opens for the actual TUI process.
+func openChatWindow() {
+	exePath, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command("cmd", "/C", "start", "Botson Chat", exePath, "tui")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: createNoWindow,
+	}
+	_ = cmd.Start()
 }
 
 func onTrayExit() {}
