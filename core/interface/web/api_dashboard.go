@@ -1,4 +1,4 @@
-package webui
+package web
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"botsonv2/core/config"
-	"botsonv2/core/gateways/discord"
+	"botsonv2/core/interface/discord"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/server/adkrest/controllers"
 	"google.golang.org/adk/v2/session"

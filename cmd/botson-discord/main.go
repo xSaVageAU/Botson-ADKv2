@@ -12,7 +12,7 @@ import (
 	"botsonv2/core/agent"
 	coreartifact "botsonv2/core/artifact"
 	"botsonv2/core/config"
-	"botsonv2/core/gateways/discord"
+	"botsonv2/core/interface/discord"
 	coresession "botsonv2/core/session"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/model/gemini"
