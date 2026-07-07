@@ -16,8 +16,10 @@ type AppConfig struct {
 }
 
 // DiscordConfig holds parameters for the Discord gateway integration.
+// Whether the gateway is running is controlled entirely by the
+// discord start/stop background daemon (or the webui's Start/Stop
+// buttons, which call the same daemon) -- not by a config flag.
 type DiscordConfig struct {
-	Enabled   bool     `json:"enabled"`
 	Token     string   `json:"token"`
 	OwnerID   string   `json:"owner_id"`
 	Whitelist []string `json:"whitelist"`

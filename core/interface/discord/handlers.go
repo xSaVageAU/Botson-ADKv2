@@ -68,7 +68,11 @@ func (g *Gateway) handleInteraction(s *discordgo.Session, i *discordgo.Interacti
 
 	// Check whitelisting authorization gate
 	if !g.isAuthorized(userID, i.Member) {
-		code := GetManager().AddPendingRequest(userID, user.Username, i.ChannelID)
+		code, err := AddPendingRequest(userID, user.Username, i.ChannelID)
+		if err != nil {
+			log.Printf("Failed to register pending authorization request: %v", err)
+			code = "unavailable, please try again"
+		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -138,7 +142,11 @@ func (g *Gateway) handleMessage(s *discordgo.Session, m *discordgo.MessageCreate
 	if isDM || mentioned {
 		// Whitelist Authorization check
 		if !g.isAuthorized(m.Author.ID, m.Member) {
-			code := GetManager().AddPendingRequest(m.Author.ID, m.Author.Username, m.ChannelID)
+			code, err := AddPendingRequest(m.Author.ID, m.Author.Username, m.ChannelID)
+			if err != nil {
+				log.Printf("Failed to register pending authorization request: %v", err)
+				code = "unavailable, please try again"
+			}
 			embed := &discordgo.MessageEmbed{
 				Title:       "🔒 Access Denied",
 				Description: fmt.Sprintf("You are not authorized to interact with this agent.\n\nPlease ask the bot administrator to approve your access code:\n\n**`%s`**", code),

@@ -18,10 +18,12 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
     *   **[`/agent`](./core/agent/)**: Custom recursive agent loader, default definitions, and tool registry.
     *   **[`/artifact`](./core/artifact/)**: Local file system service for persistent artifacts.
     *   **[`/config`](./core/config/)**: Handles configurations and workspace path lookups.
+    *   **[`/daemon`](./core/daemon/)**: Generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) shared by every backgroundable subcommand (`discord`, `web`, `tray`) in `botson-full`.
     *   **[`/interface`](./core/interface/)**: Unified system interfaces.
         *   **[`/web`](./core/interface/web/)**: Serves the unified SPA console. Includes embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), and sublauncher routing.
-        *   **[`/discord`](./core/interface/discord/)**: Coordinates the Discord Gateway listener, command handles (`commands.go`), security locks (`handlers.go`), database/disk session persistence (`sessions.go`), and Human-in-the-Loop confirms (`hitl.go`).
+        *   **[`/discord`](./core/interface/discord/)**: Coordinates the Discord Gateway listener, command handles (`commands.go`), security locks (`handlers.go`), database/disk session persistence (`sessions.go`), Human-in-the-Loop confirms (`hitl.go`), and disk-persisted pending-authorization requests (`pending.go`).
         *   **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
+    *   **[`/management`](./core/management/)**: Shared, interface-agnostic business logic (agents, config, dashboard stats, Discord daemon control) callable from both the web API and CLI — so `botson-full` and the webui always drive the exact same functions.
     *   **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation states.
     *   **[`/tools`](./core/tools/)**: Secure tools (`listFiles`, `readFile`, `loadArtifacts`, `saveArtifact`).
 
@@ -45,7 +47,7 @@ The application provides a modular approach to building, running, and analyzing 
 ## Features
 
 *   **Unified Workspace Console SPA**: Instant view switching between Dashboard metrics, LLM Chat, and Agent Config Editor, preserving transient state.
-*   **Discord Gateway Integration**: Connect with your agent registry from anywhere. Whitelisted users can start multiple persistent chat sessions, view active session details, and select past histories with easy-to-use slash commands.
+*   **Discord Gateway Integration**: Connect with your agent registry from anywhere. Whitelisted users can start multiple persistent chat sessions, view active session details, and select past histories with easy-to-use slash commands. The gateway is started/stopped as a background daemon — from the CLI (`discord start`/`stop`), the webui Settings tab's Start/Stop button, or the Windows tray icon — all three are just clients of the same background process.
 *   **Interactive Human-in-the-Loop (HITL)**: Requires authorization confirmations before execution of specific tools. The bot renders interactive button elements to the console or Discord DMs so administrators can approve or deny actions dynamically.
 *   **Concerns Separation**: Frontend code resides in CSS/JS modules (`main.css`, `dashboard.css`, `chat.css`, `builder.css`, and matching JS files). Backend endpoints are split into `api_dashboard.go` and `api_builder.go`.
 *   **Multi-Purpose CLI**: `botson-full` is a Cobra-based CLI with `tui` (default), `web`, and `discord` subcommands, each with their own flags (e.g. `web --port 9000`), while ADK-specific routing commands are automatically handled internally.
@@ -68,13 +70,13 @@ A standard template looks like:
   "gemini_api_key": "your_api_key_here",
   "root_agent": "Agent Botson",
   "discord": {
-    "enabled": true,
     "token": "your_discord_token_here",
     "owner_id": "your_discord_owner_user_id",
     "whitelist": []
   }
 }
 ```
+There is deliberately no `discord.enabled` flag: whether the gateway is running is controlled entirely by the `discord start`/`stop` background daemon (see below) — or the matching Start/Stop button in the webui Settings tab, which drives that same daemon.
 
 Compile the platform-specific binaries into the `/bin` folder:
 *   **Windows**:
@@ -92,7 +94,7 @@ Compile the platform-specific binaries into the `/bin` folder:
 ```powershell
 ./bin/botsonv2-full-windows-amd64.exe             # same as `... tui` - interactive terminal chat
 ./bin/botsonv2-full-windows-amd64.exe tui --agent "Some Agent"
-./bin/botsonv2-full-windows-amd64.exe web --port=8080 --discord
+./bin/botsonv2-full-windows-amd64.exe web --port=8080
 ./bin/botsonv2-full-windows-amd64.exe discord      # foreground, tied to this terminal
 ./bin/botsonv2-full-windows-amd64.exe --help       # list all commands and flags
 ```

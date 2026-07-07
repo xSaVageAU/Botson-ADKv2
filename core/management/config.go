@@ -2,10 +2,8 @@ package management
 
 import (
 	"fmt"
-	"log"
 
 	"botsonv2/core/config"
-	"botsonv2/core/interface/discord"
 )
 
 const maskedSecret = "******"
@@ -29,8 +27,9 @@ func GetMaskedConfig() (*config.AppConfig, error) {
 }
 
 // UpdateConfig merges a (possibly secret-masked) config update against the
-// on-disk config, persists it, and restarts the Discord gateway in the
-// background to apply any enabled/token changes.
+// on-disk config and persists it. If the Discord token changed while the
+// background gateway is running, the caller needs to restart it (via
+// StopDiscordDaemon/StartDiscordDaemon) for the change to take effect.
 func UpdateConfig(req *config.AppConfig) error {
 	diskCfg, err := config.Load()
 	if err != nil {
@@ -47,14 +46,6 @@ func UpdateConfig(req *config.AppConfig) error {
 
 	if err := config.Save(req); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	if mgr := discord.GetManager(); mgr != nil {
-		go func() {
-			if err := mgr.Restart(req.Discord.Enabled, req.Discord.Token); err != nil {
-				log.Printf("Dynamic Discord restart error: %v\n", err)
-			}
-		}()
 	}
 
 	return nil

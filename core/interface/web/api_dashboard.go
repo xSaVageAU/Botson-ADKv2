@@ -60,14 +60,68 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 		controllers.EncodeJSONResponse(map[string]string{"status": "success", "message": "Settings saved successfully"}, http.StatusOK, w)
 	})
 
-	// GET /botson/api/discord/pending - lists all pending authorization requests
-	r.Methods("GET").Path("/discord/pending").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mgr := discord.GetManager()
-		if mgr == nil {
-			controllers.EncodeJSONResponse([]discord.PendingRequest{}, http.StatusOK, w)
+	// GET /botson/api/discord/status - reports whether the background Discord gateway is running
+	r.Methods("GET").Path("/discord/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status, err := management.DiscordDaemonStatus()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		controllers.EncodeJSONResponse(mgr.GetPendingRequests(), http.StatusOK, w)
+		controllers.EncodeJSONResponse(status, http.StatusOK, w)
+	})
+
+	// POST /botson/api/discord/start - starts the Discord gateway as a background daemon
+	r.Methods("POST").Path("/discord/start").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg, err := config.Load()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if cfg.Discord.Token == "" {
+			http.Error(w, "Discord bot token is not configured", http.StatusBadRequest)
+			return
+		}
+
+		pid, logPath, err := management.StartDiscordDaemon()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		controllers.EncodeJSONResponse(map[string]any{
+			"status":  "success",
+			"message": "Discord gateway started",
+			"pid":     pid,
+			"logPath": logPath,
+		}, http.StatusOK, w)
+	})
+
+	// POST /botson/api/discord/stop - stops the background Discord gateway
+	r.Methods("POST").Path("/discord/stop").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Force bool `json:"force"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req) // absent/empty body is fine, defaults to force=false
+
+		if err := management.StopDiscordDaemon(req.Force); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		controllers.EncodeJSONResponse(map[string]string{
+			"status":  "success",
+			"message": "Discord gateway stopped",
+		}, http.StatusOK, w)
+	})
+
+	// GET /botson/api/discord/pending - lists all pending authorization requests
+	r.Methods("GET").Path("/discord/pending").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pending, err := discord.GetPendingRequests()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		controllers.EncodeJSONResponse(pending, http.StatusOK, w)
 	})
 
 	// POST /botson/api/discord/approve - approves a pending user by code or ID
@@ -84,13 +138,7 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 			return
 		}
 
-		mgr := discord.GetManager()
-		if mgr == nil {
-			http.Error(w, "Discord manager not initialized", http.StatusInternalServerError)
-			return
-		}
-
-		approvedUserID, err := mgr.ApproveRequest(req.Code)
+		approvedUserID, err := discord.ApproveRequest(req.Code)
 		if err != nil {
 			http.Error(w, "Approval failed: "+err.Error(), http.StatusBadRequest)
 			return
@@ -117,13 +165,7 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 			return
 		}
 
-		mgr := discord.GetManager()
-		if mgr == nil {
-			http.Error(w, "Discord manager not initialized", http.StatusInternalServerError)
-			return
-		}
-
-		if err := mgr.RemoveWhitelistedUser(req.UserID); err != nil {
+		if err := discord.RemoveWhitelistedUser(req.UserID); err != nil {
 			http.Error(w, "Removal failed: "+err.Error(), http.StatusBadRequest)
 			return
 		}

@@ -7,13 +7,14 @@ import (
 	"os"
 	"time"
 
+	"botsonv2/core/daemon"
 	"botsonv2/core/interface/discord"
+	"botsonv2/core/management"
 
 	"github.com/spf13/cobra"
 )
 
 const discordDaemonName = "discord"
-const discordDisplayName = "Discord gateway"
 
 func newDiscordCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -43,20 +44,20 @@ func newDiscordDaemonChildCmd() *cobra.Command {
 			daemonCtx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			ln, port, err := startControlListener(cancel)
+			ln, port, err := daemon.StartControlListener(cancel)
 			if err != nil {
 				return fmt.Errorf("failed to start control listener: %w", err)
 			}
 			defer ln.Close()
 
-			if err := writeDaemonState(discordDaemonName, daemonState{
+			if err := daemon.WriteState(discordDaemonName, daemon.State{
 				PID:       os.Getpid(),
 				Port:      port,
 				StartedAt: time.Now(),
 			}); err != nil {
 				return fmt.Errorf("failed to write daemon state: %w", err)
 			}
-			defer removeDaemonState(discordDaemonName)
+			defer daemon.RemoveState(discordDaemonName)
 
 			return runDiscord(daemonCtx)
 		},
@@ -69,7 +70,12 @@ func newDiscordStartCmd() *cobra.Command {
 		Short:             "Start the Discord gateway as a detached background process",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startDaemon(discordDaemonName, discordDisplayName, []string{"discord", "__daemon-child"})
+			pid, logPath, err := management.StartDiscordDaemon()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Started Discord gateway in background (pid %d).\nLogs: %s\n", pid, logPath)
+			return nil
 		},
 	}
 	return cmd
@@ -82,7 +88,11 @@ func newDiscordStopCmd() *cobra.Command {
 		Short:             "Stop the background Discord gateway",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return stopDaemon(discordDaemonName, discordDisplayName, force)
+			if err := management.StopDiscordDaemon(force); err != nil {
+				return err
+			}
+			fmt.Println("Discord gateway offline.")
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Force-kill the background process instead of asking it to shut down gracefully")
@@ -95,7 +105,16 @@ func newDiscordStatusCmd() *cobra.Command {
 		Short:             "Show whether the background Discord gateway is running",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printDaemonStatus(discordDaemonName, discordDisplayName)
+			status, err := management.DiscordDaemonStatus()
+			if err != nil {
+				return err
+			}
+			if !status.Running {
+				fmt.Println("Discord gateway: not running")
+				return nil
+			}
+			fmt.Printf("Discord gateway: running (pid %d, started %s)\n", status.PID, status.StartedAt.Format(time.RFC3339))
+			return nil
 		},
 	}
 }

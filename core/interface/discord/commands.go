@@ -64,7 +64,7 @@ func (g *Gateway) executeApproveCommand(s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 
-	approvedUserID, err := GetManager().ApproveRequest(codeVal)
+	approvedUserID, err := ApproveRequest(codeVal)
 	if err != nil {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,

@@ -350,19 +350,22 @@
                 <div class="settings-card">
                   <div class="card-header-toggle">
                     <h3 class="settings-card-title">Discord Bot Gateway</h3>
-                    <label class="switch">
-                      <input type="checkbox" id="discordEnabledInput" onchange="window.toggleDiscordFields(this.checked)">
-                      <span class="slider round"></span>
-                    </label>
+                    <div class="discord-gateway-controls">
+                      <span class="status-dot gray" id="discordStatusDot"></span>
+                      <span class="status-text" id="discordStatusText">Stopped</span>
+                      <button type="button" class="btn btn-primary" id="discordStartBtn" onclick="window.startDiscordGateway()">Start</button>
+                      <button type="button" class="btn btn-secondary" id="discordStopBtn" onclick="window.stopDiscordGateway()" style="display:none;">Stop</button>
+                    </div>
                   </div>
 
-                  <div id="discordFieldsContainer" class="disabled-fields">
+                  <div id="discordFieldsContainer">
                     <div class="form-group">
                       <label for="discordTokenInput">Discord Bot Token</label>
                       <div class="password-input-wrapper">
                         <input type="password" id="discordTokenInput" placeholder="Enter Discord bot token...">
                         <button type="button" class="reveal-btn" onclick="window.togglePasswordVisibility('discordTokenInput')">👁️</button>
                       </div>
+                      <small class="form-help">Start/stop the gateway with the button above once a token is saved. Changing the token while it's running requires a Stop then Start to take effect.</small>
                     </div>
 
                     <div class="form-group">

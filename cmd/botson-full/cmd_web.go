@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"botsonv2/core/interface/discord"
+	"botsonv2/core/daemon"
 	webui "botsonv2/core/interface/web"
 
 	"github.com/spf13/cobra"
@@ -24,18 +24,16 @@ const webDisplayName = "Web server"
 func newWebCmd() *cobra.Command {
 	var port int
 	var otelToCloud bool
-	var withDiscord bool
 
 	cmd := &cobra.Command{
 		Use:   "web",
 		Short: "Start the unified web console with REST & A2A APIs",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runWeb(cmd.Context(), port, otelToCloud, withDiscord)
+			return runWeb(cmd.Context(), port, otelToCloud)
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
 	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
-	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
 
 	cmd.AddCommand(newWebStartCmd(), newWebStopCmd(), newWebStatusCmd(), newWebDaemonChildCmd())
 	return cmd
@@ -43,12 +41,11 @@ func newWebCmd() *cobra.Command {
 
 // webDaemonChildArgs builds the argv used to relaunch this executable as the
 // detached __daemon-child process, carrying the same flags the user passed.
-func webDaemonChildArgs(port int, otelToCloud, withDiscord bool) []string {
+func webDaemonChildArgs(port int, otelToCloud bool) []string {
 	return []string{
 		"web", "__daemon-child",
 		"--port=" + strconv.Itoa(port),
 		"--otel_to_cloud=" + strconv.FormatBool(otelToCloud),
-		"--discord=" + strconv.FormatBool(withDiscord),
 	}
 }
 
@@ -57,7 +54,6 @@ func webDaemonChildArgs(port int, otelToCloud, withDiscord bool) []string {
 func newWebDaemonChildCmd() *cobra.Command {
 	var port int
 	var otelToCloud bool
-	var withDiscord bool
 
 	cmd := &cobra.Command{
 		Use:    "__daemon-child",
@@ -66,46 +62,48 @@ func newWebDaemonChildCmd() *cobra.Command {
 			daemonCtx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			ln, ctrlPort, err := startControlListener(cancel)
+			ln, ctrlPort, err := daemon.StartControlListener(cancel)
 			if err != nil {
 				return fmt.Errorf("failed to start control listener: %w", err)
 			}
 			defer ln.Close()
 
-			if err := writeDaemonState(webDaemonName, daemonState{
+			if err := daemon.WriteState(webDaemonName, daemon.State{
 				PID:       os.Getpid(),
 				Port:      ctrlPort,
 				StartedAt: time.Now(),
 			}); err != nil {
 				return fmt.Errorf("failed to write daemon state: %w", err)
 			}
-			defer removeDaemonState(webDaemonName)
+			defer daemon.RemoveState(webDaemonName)
 
-			return runWeb(daemonCtx, port, otelToCloud, withDiscord)
+			return runWeb(daemonCtx, port, otelToCloud)
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
 	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
-	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
 	return cmd
 }
 
 func newWebStartCmd() *cobra.Command {
 	var port int
 	var otelToCloud bool
-	var withDiscord bool
 
 	cmd := &cobra.Command{
 		Use:               "start",
 		Short:             "Start the web console as a detached background process",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startDaemon(webDaemonName, webDisplayName, webDaemonChildArgs(port, otelToCloud, withDiscord))
+			pid, logPath, err := daemon.Start(webDaemonName, webDisplayName, webDaemonChildArgs(port, otelToCloud))
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Started %s in background (pid %d).\nLogs: %s\n", webDisplayName, pid, logPath)
+			return nil
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
 	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
-	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
 	return cmd
 }
 
@@ -116,7 +114,11 @@ func newWebStopCmd() *cobra.Command {
 		Short:             "Stop the background web server",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return stopDaemon(webDaemonName, webDisplayName, force)
+			if err := daemon.Stop(webDaemonName, webDisplayName, force); err != nil {
+				return err
+			}
+			fmt.Printf("%s offline.\n", webDisplayName)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Force-kill the background process instead of asking it to shut down gracefully")
@@ -129,12 +131,21 @@ func newWebStatusCmd() *cobra.Command {
 		Short:             "Show whether the background web server is running",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printDaemonStatus(webDaemonName, webDisplayName)
+			status, err := daemon.GetStatus(webDaemonName, webDisplayName)
+			if err != nil {
+				return err
+			}
+			if !status.Running {
+				fmt.Printf("%s: not running\n", webDisplayName)
+				return nil
+			}
+			fmt.Printf("%s: running (pid %d, started %s)\n", webDisplayName, status.PID, status.StartedAt.Format(time.RFC3339))
+			return nil
 		},
 	}
 }
 
-func runWeb(ctx context.Context, port int, otelToCloud, withDiscord bool) error {
+func runWeb(ctx context.Context, port int, otelToCloud bool) error {
 	// We configure the launcher with only ADK's production sublaunchers (REST and A2A) and our custom console
 	customLauncher := universal.NewLauncher(
 		web.NewLauncher(
@@ -143,26 +154,6 @@ func runWeb(ctx context.Context, port int, otelToCloud, withDiscord bool) error 
 			webui.NewSublauncher(),
 		),
 	)
-
-	// Initialize the Discord Gateway manager so the console's Discord routes work
-	mgr := discord.InitManager(boot.Launcher)
-
-	discordEnabled := boot.Config.Discord.Enabled || withDiscord
-	if discordEnabled {
-		token := boot.Config.Discord.Token
-		if token == "" {
-			log.Println("Discord Warning: Discord integration is enabled, but Token is empty in config.json. Gateway disabled.")
-		} else {
-			log.Println("Starting background Discord Gateway via manager in background...")
-			go func() {
-				if err := mgr.Start(token); err != nil {
-					log.Printf("Discord Error: failed to start gateway: %v\n", err)
-				} else {
-					log.Println("Discord Gateway is online in the background.")
-				}
-			}()
-		}
-	}
 
 	fmt.Printf("Starting Botson web server on http://localhost:%d... please do not close this window.\n", port)
 
@@ -174,12 +165,6 @@ func runWeb(ctx context.Context, port int, otelToCloud, withDiscord bool) error 
 	}
 
 	execErr := customLauncher.Execute(ctx, boot.Launcher, args)
-
-	// Stop the Discord Gateway synchronously before the process terminates
-	if mgr.IsRunning() {
-		log.Println("Shutting down background Discord Gateway...")
-		_ = mgr.Stop()
-	}
 
 	if execErr != nil && ctx.Err() == nil {
 		return fmt.Errorf("web server execution failed: %w", execErr)

@@ -20,6 +20,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await window.loadSettings();
   await window.loadUsers();
   await window.switchView('dashboard');
+  setInterval(window.refreshDiscordStatus, 5000);
 });
 
 window.loadUsers = async function () {
@@ -181,20 +182,77 @@ window.togglePasswordVisibility = function (id) {
   input.type = input.type === 'password' ? 'text' : 'password';
 };
 
-window.toggleDiscordFields = function (checked) {
-  const container = document.getElementById('discordFieldsContainer');
-  if (!container) return;
-
-  if (checked) {
-    container.classList.remove('disabled-fields');
-  } else {
-    container.classList.add('disabled-fields');
+// Access Control (pending approvals / whitelist) is only useful once a
+// token is configured -- it's independent of whether the gateway is
+// currently running, since an admin may want to pre-approve users before
+// starting it for the first time.
+window.updateDiscordAccessControlVisibility = function (hasToken) {
+  const acCard = document.getElementById('discordAccessControlCard');
+  if (acCard) {
+    acCard.style.display = hasToken ? 'flex' : 'none';
   }
+};
 
-  // Update disabled state of input fields
-  container.querySelectorAll('input').forEach(inp => {
-    inp.disabled = !checked;
-  });
+window.refreshDiscordStatus = async function () {
+  const dot = document.getElementById('discordStatusDot');
+  const text = document.getElementById('discordStatusText');
+  const startBtn = document.getElementById('discordStartBtn');
+  const stopBtn = document.getElementById('discordStopBtn');
+  if (!dot || !text || !startBtn || !stopBtn) return;
+
+  try {
+    const res = await fetch('/botson/api/discord/status');
+    if (!res.ok) throw new Error('Failed to fetch status');
+    const status = await res.json();
+
+    if (status.running) {
+      dot.className = 'status-dot green';
+      text.textContent = `Running (pid ${status.pid})`;
+      startBtn.style.display = 'none';
+      stopBtn.style.display = '';
+    } else {
+      dot.className = 'status-dot gray';
+      text.textContent = 'Stopped';
+      startBtn.style.display = '';
+      stopBtn.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Failed to fetch Discord gateway status:', err);
+  }
+};
+
+window.startDiscordGateway = async function () {
+  try {
+    const res = await fetch('/botson/api/discord/start', { method: 'POST' });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to start Discord gateway');
+    }
+    window.showToast('Discord gateway started', 'success');
+  } catch (err) {
+    window.showToast('Failed to start Discord gateway: ' + err.message, 'error');
+  } finally {
+    await window.refreshDiscordStatus();
+  }
+};
+
+window.stopDiscordGateway = async function () {
+  try {
+    const res = await fetch('/botson/api/discord/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: false })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to stop Discord gateway');
+    }
+    window.showToast('Discord gateway stopped', 'success');
+  } catch (err) {
+    window.showToast('Failed to stop Discord gateway: ' + err.message, 'error');
+  } finally {
+    await window.refreshDiscordStatus();
+  }
 };
 
 window.loadSettings = async function () {
@@ -204,7 +262,6 @@ window.loadSettings = async function () {
     const cfg = await res.json();
 
     document.getElementById('geminiApiKeyInput').value = cfg.gemini_api_key || '';
-    document.getElementById('discordEnabledInput').checked = !!(cfg.discord && cfg.discord.enabled);
     document.getElementById('discordTokenInput').value = (cfg.discord && cfg.discord.token) || '';
     document.getElementById('discordOwnerIdInput').value = (cfg.discord && cfg.discord.owner_id) || '';
 
@@ -217,7 +274,8 @@ window.loadSettings = async function () {
       window.activeAgent = cfg.root_agent;
     }
 
-    window.toggleDiscordFields(!!(cfg.discord && cfg.discord.enabled));
+    window.updateDiscordAccessControlVisibility(!!(cfg.discord && cfg.discord.token));
+    await window.refreshDiscordStatus();
 
     // Populate Access Control lists
     await window.renderAccessControl(window.currentWhitelist);
@@ -271,18 +329,11 @@ window.renderAccessControl = async function (whitelist) {
     }
   }
 
-  // Hide Access Control Card if Discord bot is disabled entirely
-  const enabled = document.getElementById('discordEnabledInput').checked;
-  const acCard = document.getElementById('discordAccessControlCard');
-  if (acCard) {
-    if (enabled) {
-      acCard.style.display = 'flex';
-    } else {
-      acCard.style.display = 'none';
-    }
-  }
+  // Hide Access Control Card if no Discord token is configured at all
+  const hasToken = !!document.getElementById('discordTokenInput').value;
+  window.updateDiscordAccessControlVisibility(hasToken);
 
-  if (!enabled) return;
+  if (!hasToken) return;
 
   // 2. Fetch and Render Pending Authorization Requests
   try {
@@ -364,7 +415,6 @@ window.saveSettings = async function (event) {
     gemini_api_key: document.getElementById('geminiApiKeyInput').value.trim(),
     root_agent: document.getElementById('rootAgentSelect') ? document.getElementById('rootAgentSelect').value : (window.currentRootAgent || ""),
     discord: {
-      enabled: document.getElementById('discordEnabledInput').checked,
       token: document.getElementById('discordTokenInput').value.trim(),
       owner_id: document.getElementById('discordOwnerIdInput').value.trim(),
       whitelist: window.currentWhitelist || []

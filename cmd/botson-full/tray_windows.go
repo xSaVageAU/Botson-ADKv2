@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"botsonv2/core/daemon"
+
 	"github.com/getlantern/systray"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +51,12 @@ func newTrayStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start the tray icon as a detached background process (no console window)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startDaemon(trayDaemonName, trayDisplayName, []string{"tray", "__daemon-child"})
+			pid, logPath, err := daemon.Start(trayDaemonName, trayDisplayName, []string{"tray", "__daemon-child"})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Started %s in background (pid %d).\nLogs: %s\n", trayDisplayName, pid, logPath)
+			return nil
 		},
 	}
 }
@@ -60,7 +67,11 @@ func newTrayStopCmd() *cobra.Command {
 		Use:   "stop",
 		Short: "Stop the background tray icon",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return stopDaemon(trayDaemonName, trayDisplayName, force)
+			if err := daemon.Stop(trayDaemonName, trayDisplayName, force); err != nil {
+				return err
+			}
+			fmt.Printf("%s offline.\n", trayDisplayName)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Force-kill instead of asking it to quit gracefully")
@@ -72,7 +83,16 @@ func newTrayStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show whether the tray icon is running",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printDaemonStatus(trayDaemonName, trayDisplayName)
+			status, err := daemon.GetStatus(trayDaemonName, trayDisplayName)
+			if err != nil {
+				return err
+			}
+			if !status.Running {
+				fmt.Printf("%s: not running\n", trayDisplayName)
+				return nil
+			}
+			fmt.Printf("%s: running (pid %d, started %s)\n", trayDisplayName, status.PID, status.StartedAt.Format(time.RFC3339))
+			return nil
 		},
 	}
 }
@@ -84,20 +104,20 @@ func runTray(ctx context.Context) error {
 	daemonCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	ln, port, err := startControlListener(cancel)
+	ln, port, err := daemon.StartControlListener(cancel)
 	if err != nil {
 		return fmt.Errorf("failed to start control listener: %w", err)
 	}
 	defer ln.Close()
 
-	if err := writeDaemonState(trayDaemonName, daemonState{
+	if err := daemon.WriteState(trayDaemonName, daemon.State{
 		PID:       os.Getpid(),
 		Port:      port,
 		StartedAt: time.Now(),
 	}); err != nil {
 		return fmt.Errorf("failed to write daemon state: %w", err)
 	}
-	defer removeDaemonState(trayDaemonName)
+	defer daemon.RemoveState(trayDaemonName)
 
 	go func() {
 		<-daemonCtx.Done()
@@ -128,7 +148,7 @@ var traySvcDiscord = &trayService{
 var traySvcWeb = &trayService{
 	id:          webDaemonName,
 	displayName: "Web",
-	childArgs:   webDaemonChildArgs(8080, false, false),
+	childArgs:   webDaemonChildArgs(8080, false),
 }
 
 func onTrayReady() {
@@ -159,8 +179,8 @@ func onTrayReady() {
 	}()
 	go func() {
 		<-mStopAllQuit.ClickedCh
-		_ = stopDaemon(traySvcDiscord.id, traySvcDiscord.displayName, false)
-		_ = stopDaemon(traySvcWeb.id, traySvcWeb.displayName, false)
+		_ = daemon.Stop(traySvcDiscord.id, traySvcDiscord.displayName, false)
+		_ = daemon.Stop(traySvcWeb.id, traySvcWeb.displayName, false)
 		systray.Quit()
 	}()
 }
@@ -180,8 +200,8 @@ func trayPollLoop() {
 }
 
 func refreshTrayService(svc *trayService) {
-	state, err := readDaemonState(svc.id)
-	svc.running = err == nil && daemonAlive(state)
+	status, err := daemon.GetStatus(svc.id, svc.displayName)
+	svc.running = err == nil && status.Running
 	if svc.toggle == nil {
 		return
 	}
@@ -194,9 +214,9 @@ func refreshTrayService(svc *trayService) {
 
 func toggleTrayService(svc *trayService) {
 	if svc.running {
-		_ = stopDaemon(svc.id, svc.displayName, false)
+		_ = daemon.Stop(svc.id, svc.displayName, false)
 	} else {
-		_ = startDaemon(svc.id, svc.displayName, svc.childArgs)
+		_, _, _ = daemon.Start(svc.id, svc.displayName, svc.childArgs)
 	}
 	refreshTrayService(svc)
 }
