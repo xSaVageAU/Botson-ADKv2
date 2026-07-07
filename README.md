@@ -53,17 +53,24 @@ The application provides a modular approach to building, running, and analyzing 
 
 ## Setup & Configuration
 
-### 1. Environment Variables
-Ensure `GEMINI_API_KEY` and your Discord variables are configured:
-*   `GEMINI_API_KEY`: API Key for Google Gemini.
-*   `DISCORD_TOKEN`: Discord Bot Token.
-*   `DISCORD_OWNER_ID`: Discord User ID of the primary administrator.
+### 1. Application Configuration
+All system-wide variables (Gemini API key, Discord token, and admin whitelisting) are configured in the `config.json` file located in the user configuration directory (`~/.botsonv2/config.json`). 
 
-These can be set in your environment or a `.env` file at the root:
-```env
-GEMINI_API_KEY=your_api_key_here
-DISCORD_TOKEN=your_token_here
-DISCORD_OWNER_ID=your_owner_id_here
+You can edit this file directly or update these properties dynamically using the **Settings** tab in the Workspace Console web interface.
+
+A standard template looks like:
+```json
+{
+  "model_name": "gemini-3.1-flash-lite",
+  "gemini_api_key": "your_api_key_here",
+  "root_agent": "Agent Botson",
+  "discord": {
+    "enabled": true,
+    "token": "your_discord_token_here",
+    "owner_id": "your_discord_owner_user_id",
+    "whitelist": []
+  }
+}
 ```
 
 ### 2. Building
