@@ -135,10 +135,11 @@ Logs and state follow the same convention: `~/.botsonv2/logs/tray.log` and `~/.b
 
 `setup` also has `uninstall` and `reset`, rounding out the machine lifecycle alongside `install`:
 ```powershell
-./bin/botsonv2-windows-amd64.exe setup uninstall  # one confirmation, then automatic
-./bin/botsonv2-windows-amd64.exe setup reset       # interactive, per-category keep/replace
+./bin/botsonv2-windows-amd64.exe setup uninstall         # confirm, optionally keep config.json, everything else deleted
+./bin/botsonv2-windows-amd64.exe setup uninstall --full  # same, but also deletes config.json without asking
+./bin/botsonv2-windows-amd64.exe setup reset             # interactive, per-category keep/replace
 ```
-`uninstall` stops any running `discord`/`web`/`tray` daemons, removes the PATH entry and tray-autostart registration, and deletes the installed binary — it never touches `~/.botsonv2` (config, sessions, custom agents), so your data survives a reinstall. `reset` asks per category ("Keep your Gemini API key?", "Keep your Discord settings?") whether to keep or immediately replace each one — reusing the same prompts `install` uses — and separately, defaulting to *no*, whether to also wipe session history and custom agents. Either way it ends with a valid, saved config, ready to run right away.
+`uninstall` stops any running `discord`/`web`/`tray` daemons, removes the PATH entry and tray-autostart registration, and deletes the installed binary, then asks whether to keep `config.json` — everything else under `~/.botsonv2` (sessions, custom agents, logs) is deleted either way. `--full` skips that question and deletes `config.json` too, for a complete wipe. `reset` asks per category ("Keep your Gemini API key?", "Keep your Discord settings?") whether to keep or immediately replace each one — reusing the same prompts `install` uses — and separately, defaulting to *no*, whether to also wipe session history and custom agents. Either way it ends with a valid, saved config, ready to run right away.
 
 The other two `cmd/` entry points remain standalone, single-purpose binaries:
 *   **Standalone Discord Bot Gateway** (Discord integration listener only — a minimal, single-interface deployment):

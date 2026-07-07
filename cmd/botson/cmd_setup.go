@@ -31,13 +31,16 @@ func newSetupInstallCmd() *cobra.Command {
 }
 
 func newSetupUninstallCmd() *cobra.Command {
-	return &cobra.Command{
+	var full bool
+	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove Botson from PATH/startup and delete the installed binary (keeps your config/data)",
+		Short: "Remove Botson from PATH/startup, delete the installed binary, and clear data",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return setup.Uninstall(cmd.Context())
+			return setup.Uninstall(cmd.Context(), full)
 		},
 	}
+	cmd.Flags().BoolVar(&full, "full", false, "Also delete config.json without asking (a complete wipe of ~/.botsonv2)")
+	return cmd
 }
 
 func newSetupResetCmd() *cobra.Command {

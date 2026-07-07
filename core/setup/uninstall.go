@@ -3,18 +3,21 @@ package setup
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 
+	"botsonv2/core/config"
 	"botsonv2/core/daemon"
 )
 
 // Uninstall stops any running background daemons, removes the tray
-// autostart registration and PATH entry, and deletes the installed
-// binary. It never touches ~/.botsonv2 (config, sessions, custom agents,
-// logs) -- those survive so a future `setup install` picks up where you
-// left off.
-func Uninstall(ctx context.Context) error {
-	confirmed, err := AskYesNo("This will remove Botson from PATH/startup and delete the installed binary (your config and data are kept). Continue?", false)
+// autostart registration, PATH entry, and installed binary. Unless full is
+// true, it then asks whether to keep config.json, deleting everything else
+// under ~/.botsonv2 (sessions, custom agents, logs) either way; full skips
+// that question and deletes config.json too.
+func Uninstall(ctx context.Context, full bool) error {
+	confirmed, err := AskYesNo("Are you sure you want to uninstall Botson? This will delete the PATH/Startup and installed binary.", false)
 	if err != nil {
 		return err
 	}
@@ -49,7 +52,55 @@ func Uninstall(ctx context.Context) error {
 		return fmt.Errorf("failed to remove installed binary: %w", err)
 	}
 
-	fmt.Println("Botson has been uninstalled. Your configuration and data remain at ~/.botsonv2.")
+	deleteConfig := full
+	if !full {
+		keepConfig, err := AskYesNo("Do you want to keep your config.json file? Everything else will be deleted.", true)
+		if err != nil {
+			return err
+		}
+		deleteConfig = !keepConfig
+	}
+
+	if err := wipeDataDir(deleteConfig); err != nil {
+		return err
+	}
+
+	if deleteConfig {
+		fmt.Println("Botson has been uninstalled and all data removed.")
+	} else {
+		fmt.Println("Botson has been uninstalled. Your config.json remains at ~/.botsonv2.")
+	}
+	return nil
+}
+
+// wipeDataDir deletes everything under the data directory except "bin"
+// (its binary removal is handled separately above, and may still be
+// pending via a deferred delete on Windows) and, unless deleteConfig is
+// true, "config.json".
+func wipeDataDir(deleteConfig bool) error {
+	dataDir, err := config.GetDataDir()
+	if err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		return fmt.Errorf("failed to read data directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == "bin" {
+			continue
+		}
+		if name == "config.json" && !deleteConfig {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dataDir, name)); err != nil {
+			return fmt.Errorf("failed to remove %s: %w", name, err)
+		}
+	}
+
 	return nil
 }
 
