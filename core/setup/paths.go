@@ -9,7 +9,7 @@ import (
 
 // binaryName is the stable, platform-appropriate name the binary is
 // installed under, regardless of what the original downloaded file was
-// called (e.g. botsonv2-full-windows-amd64.exe).
+// called (e.g. botsonv2-windows-amd64.exe).
 func binaryName() string {
 	if runtime.GOOS == "windows" {
 		return "botson.exe"

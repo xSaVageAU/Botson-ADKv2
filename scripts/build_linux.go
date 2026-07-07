@@ -32,10 +32,8 @@ func main() {
 		name string
 		dir  string
 	}{
-		{"botsonv2-full", "cmd/botson-full"},
-		{"botsonv2-web", "cmd/botson-web"},
+		{"botsonv2", "cmd/botson"},
 		{"botsonv2-discord", "cmd/botson-discord"},
-		{"botsonv2-tui", "cmd/botson-tui"},
 		{"botsonv2-adk", "cmd/botson-adk"},
 	}
 

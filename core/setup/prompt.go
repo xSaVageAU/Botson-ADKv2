@@ -1,8 +1,8 @@
-// Package setup implements the botson-full `setup install/uninstall/reset`
+// Package setup implements the `botson setup install/uninstall/reset`
 // commands: getting the binary onto the machine (and PATH), tearing it back
 // off, and resetting config/data to a clean slate. Plain functions, no Cobra
-// awareness, so cmd/botson-full stays a thin wrapper -- same shape as
-// core/daemon and core/management.
+// awareness, so cmd/botson stays a thin wrapper -- same shape as core/daemon
+// and core/management.
 package setup
 
 import (
