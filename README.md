@@ -110,11 +110,20 @@ Compile the platform-specific binaries into the `/bin` folder:
 ```
 Background logs go to `~/.botsonv2/logs/discord.log` and `~/.botsonv2/logs/web.log`, and lifecycle state to `~/.botsonv2/discord.pid` and `~/.botsonv2/web.pid`. Since Windows has no way to deliver a graceful shutdown signal to an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this also works identically on Linux.
 
-On Windows, `tray` puts an icon in the system tray that mirrors and controls both of the above — it polls the same state files `status` reads and shells out to the same `start`/`stop` logic, so it never needs to be running for the background services to keep working, and closing it never stops them:
+On Windows, `tray` puts an icon in the system tray that mirrors and controls both of the above — it polls the same state files `status` reads and calls the same `start`/`stop` logic directly, so it never needs to be running for the background services to keep working, and closing it never stops them:
 ```powershell
 ./bin/botsonv2-full-windows-amd64.exe tray
 ```
 The tray menu offers "Start/Stop Discord" and "Start/Stop Web" toggles, a plain "Quit" that just removes the icon (services keep running), and a "Stop All & Quit" that gracefully stops both before exiting.
+
+`tray` gets the exact same `start`/`stop`/`status` background lifecycle as `discord` and `web` — `tray start` launches it fully detached with no console window (so it can be put in the Windows Startup folder and appear silently on login), and `tray stop`/`status` let you control it from a terminal without having to right-click the icon:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe tray start           # detach, no console window, icon appears
+./bin/botsonv2-full-windows-amd64.exe tray status
+./bin/botsonv2-full-windows-amd64.exe tray stop             # ask it to quit gracefully
+./bin/botsonv2-full-windows-amd64.exe tray stop --force
+```
+Logs and state follow the same convention: `~/.botsonv2/logs/tray.log` and `~/.botsonv2/tray.pid`.
 
 The other four `cmd/` entry points remain standalone single-purpose binaries — useful as isolated testing grounds for their respective `core/interface/*` packages:
 *   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
