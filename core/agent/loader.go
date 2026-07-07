@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -200,10 +199,7 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 		}
 	}
 
-	// 3.5 Load all custom workflows from disk, compiling them and adding them to the built map
-	if err := LoadAllWorkflows(built, model); err != nil {
-		log.Printf("Workflow Loader Error: failed to load workflows: %v", err)
-	}
+
 
 	// 4. Find root agent and compile otherAgents list (filtering out private agents)
 	appConfig, errCfg := config.Load()
