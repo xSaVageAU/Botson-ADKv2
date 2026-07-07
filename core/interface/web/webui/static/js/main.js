@@ -8,7 +8,7 @@ window.activeAgent = null;
 window.activeSessionId = null;
 window.isNewSession = false;
 window.activeInspectorTab = 'state';
-window.currentUser = 'user';
+window.currentUser = 'web';
 
 // Builder state
 window.allAgents = [];

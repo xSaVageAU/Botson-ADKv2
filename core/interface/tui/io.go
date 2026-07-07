@@ -17,7 +17,7 @@ func (m model) runAgentStream(text string) {
 		Role:  "user",
 		Parts: []*genai.Part{{Text: text}},
 	}
-	runIter := m.runner.Run(ctx, "user", m.sessionID, &userMsg, adkagent.RunConfig{})
+	runIter := m.runner.Run(ctx, "tui", m.sessionID, &userMsg, adkagent.RunConfig{})
 
 	for event, err := range runIter {
 		if err != nil {

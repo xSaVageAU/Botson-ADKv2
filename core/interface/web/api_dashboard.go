@@ -149,16 +149,16 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 	// GET /botson/api/users - returns list of all unique user IDs across all sessions
 	r.Methods("GET").Path("/users").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if configLauncher == nil || configLauncher.SessionService == nil {
-			controllers.EncodeJSONResponse([]string{"user"}, http.StatusOK, w)
+			controllers.EncodeJSONResponse([]string{"web"}, http.StatusOK, w)
 			return
 		}
-		
+
 		ctx := r.Context()
 		agentNames := configLauncher.AgentLoader.ListAgents()
-		
+
 		userMap := make(map[string]bool)
 		// Default UI context
-		userMap["user"] = true
+		userMap["web"] = true
 
 		for _, name := range agentNames {
 			listResponse, err := configLauncher.SessionService.List(ctx, &session.ListRequest{

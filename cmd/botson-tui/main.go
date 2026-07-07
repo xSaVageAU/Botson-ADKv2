@@ -99,7 +99,7 @@ func main() {
 	sessionID := uuid.New().String()
 	_, err = dbSessionService.Create(ctx, &session.CreateRequest{
 		AppName:   targetAgentName,
-		UserID:    "user",
+		UserID:    "tui",
 		SessionID: sessionID,
 		State: map[string]any{
 			"__session_metadata__": map[string]any{
