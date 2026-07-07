@@ -1,4 +1,4 @@
-package main
+package tui
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"google.golang.org/adk/v2/runner"
 )
 
-func initialModel(r *runner.Runner, sessionID, agentName string) model {
+func newModel(r *runner.Runner, sessionID, agentName string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message... (or type '/exit' to quit)"
 	ti.Focus()
@@ -57,9 +57,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 3
 
-		m.textInput.Width = msg.Width - 10
+		// Reserve exactly as many lines as the footer actually renders (plus one
+		// blank separator line) instead of a hardcoded guess, so an unusually
+		// long status line can never push the viewport past the terminal edge.
+		footerHeight := lipgloss.Height(m.footerView())
+		viewportHeight := msg.Height - footerHeight - 1
+		if viewportHeight < 1 {
+			viewportHeight = 1
+		}
+		m.viewport.Height = viewportHeight
+
+		promptWidth := lipgloss.Width(m.textInput.Prompt)
+		inputWidth := msg.Width - promptWidth - 1
+		if inputWidth < 1 {
+			inputWidth = 1
+		}
+		m.textInput.Width = inputWidth
+
 		m.viewport.SetContent(m.renderHistory())
 		m.viewport.GotoBottom()
 
@@ -152,18 +167,25 @@ func (m model) renderHistory() string {
 	return sb.String()
 }
 
-func (m model) View() string {
-	var sb strings.Builder
-
-	// Viewport Content
-	sb.WriteString(m.viewport.View() + "\n\n")
-
-	// Input Footer / Spinner
-	if m.thinking {
-		sb.WriteString(m.spinner.View() + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Agent is thinking..."))
-	} else {
-		sb.WriteString(m.textInput.View())
+// footerView renders the bottom status line (either the text input or the
+// "thinking" spinner), constrained to the current terminal width so it can
+// never overflow into an extra line the layout hasn't budgeted for.
+func (m model) footerView() string {
+	width := m.width
+	if width <= 0 {
+		width = 80
 	}
 
-	return sb.String()
+	var content string
+	if m.thinking {
+		content = m.spinner.View() + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Agent is thinking...")
+	} else {
+		content = m.textInput.View()
+	}
+
+	return lipgloss.NewStyle().MaxWidth(width).Render(content)
+}
+
+func (m model) View() string {
+	return lipgloss.JoinVertical(lipgloss.Left, m.viewport.View(), "", m.footerView())
 }

@@ -1,4 +1,4 @@
-package main
+package tui
 
 import (
 	"context"
@@ -41,6 +41,9 @@ func (m model) runAgentStream(text string) {
 	program.Send(responseDoneMsg{})
 }
 
+// silenceGormLogger reaches into the ADK database session service via unsafe
+// reflection to mute its GORM logger, since it writes to stdout and would
+// otherwise corrupt the Bubble Tea alt-screen rendering.
 func silenceGormLogger(service interface{}) {
 	val := reflect.ValueOf(service)
 	if val.Kind() != reflect.Ptr {
