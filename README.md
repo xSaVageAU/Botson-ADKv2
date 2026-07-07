@@ -74,11 +74,15 @@ A standard template looks like:
 }
 ```
 
-### 2. Building
-Compile all platform binaries into the `/bin` folder using the build script:
-```powershell
-go run scripts/build.go
-```
+Compile the platform-specific binaries into the `/bin` folder:
+*   **Windows**:
+    ```powershell
+    go run scripts/build_windows.go
+    ```
+*   **Linux**:
+    ```powershell
+    go run scripts/build_linux.go
+    ```
 
 ### 3. Running
 Run the appropriate entry point depending on your use case:

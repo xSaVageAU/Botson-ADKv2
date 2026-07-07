@@ -26,7 +26,6 @@ func main() {
 		suffix string
 	}{
 		{"windows", "amd64", ".exe"},
-		{"linux", "amd64", ""},
 	}
 
 	apps := []struct {
@@ -70,5 +69,5 @@ func main() {
 		}
 	}
 	wg.Wait()
-	fmt.Println("All builds successful.")
+	fmt.Println("Windows builds successful.")
 }
