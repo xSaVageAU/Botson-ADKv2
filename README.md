@@ -9,7 +9,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
 ## Project Structure
 
 *   **`/cmd`**: Contains project application entry points. Five standalone applications, each a testing ground / entry point for one interface; `botson-full` is the only one meant to combine them into a single seamless deployment.
-    *   **[`/botson-full`](./cmd/botson-full/)**: The end-result application — a Cobra CLI with `tui` (default), `web`, and `discord` subcommands, so one binary can boot a chat session, the custom web console + REST/A2A APIs, or the Discord Gateway. Does not include the built-in ADK web launcher.
+    *   **[`/botson-full`](./cmd/botson-full/)**: The end-result application — a Cobra CLI with `tui` (default), `web`, `discord`, and (Windows only) `tray` subcommands, so one binary can boot a chat session, the custom web console + REST/A2A APIs, the Discord Gateway, or a system tray icon for monitoring/controlling the other two in the background. Does not include the built-in ADK web launcher.
     *   **[`/botson-web`](./cmd/botson-web/)**: Boots a standalone instance of just the custom unified console SPA (dashboard, chat, agent builder), without APIs or Discord.
     *   **[`/botson-discord`](./cmd/botson-discord/)**: Starts a standalone Discord Gateway bot listener.
     *   **[`/botson-tui`](./cmd/botson-tui/)**: Standalone terminal-based chat client (Bubble Tea), used as a testing ground for `core/interface/tui`.
@@ -49,6 +49,7 @@ The application provides a modular approach to building, running, and analyzing 
 *   **Interactive Human-in-the-Loop (HITL)**: Requires authorization confirmations before execution of specific tools. The bot renders interactive button elements to the console or Discord DMs so administrators can approve or deny actions dynamically.
 *   **Concerns Separation**: Frontend code resides in CSS/JS modules (`main.css`, `dashboard.css`, `chat.css`, `builder.css`, and matching JS files). Backend endpoints are split into `api_dashboard.go` and `api_builder.go`.
 *   **Multi-Purpose CLI**: `botson-full` is a Cobra-based CLI with `tui` (default), `web`, and `discord` subcommands, each with their own flags (e.g. `web --port 9000`), while ADK-specific routing commands are automatically handled internally.
+*   **Background Services & System Tray**: `web` and `discord` can each run as a detached background process with `start`/`stop`/`status` subcommands, and (on Windows) a `tray` subcommand shows both as a system tray icon with one-click start/stop.
 *   **Multi-Agent Registry & GORM Sessions**: Save custom agents dynamically to `~/.botsonv2/agents/` and maintain conversation states, artifacts, and telemetry spans in an SQLite db.
 
 ---
@@ -96,14 +97,24 @@ Compile the platform-specific binaries into the `/bin` folder:
 ./bin/botsonv2-full-windows-amd64.exe --help       # list all commands and flags
 ```
 
-`discord` also supports running as a detached background process, independent of the terminal, with a PID-file-backed lifecycle so it can be checked on and stopped later:
+`discord` and `web` both also support running as a detached background process, independent of the terminal, with a PID-file-backed lifecycle so they can be checked on and stopped later:
 ```powershell
 ./bin/botsonv2-full-windows-amd64.exe discord start          # detach and run in the background
 ./bin/botsonv2-full-windows-amd64.exe discord status          # check if it's running
 ./bin/botsonv2-full-windows-amd64.exe discord stop            # ask it to shut down gracefully
 ./bin/botsonv2-full-windows-amd64.exe discord stop --force    # hard-kill if it won't respond
+
+./bin/botsonv2-full-windows-amd64.exe web start --port=8080   # same lifecycle, for the web console
+./bin/botsonv2-full-windows-amd64.exe web status
+./bin/botsonv2-full-windows-amd64.exe web stop
 ```
-Background logs go to `~/.botsonv2/logs/discord.log`, and lifecycle state to `~/.botsonv2/discord.pid`. Since Windows has no way to deliver a graceful shutdown signal to an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this also works identically on Linux.
+Background logs go to `~/.botsonv2/logs/discord.log` and `~/.botsonv2/logs/web.log`, and lifecycle state to `~/.botsonv2/discord.pid` and `~/.botsonv2/web.pid`. Since Windows has no way to deliver a graceful shutdown signal to an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this also works identically on Linux.
+
+On Windows, `tray` puts an icon in the system tray that mirrors and controls both of the above — it polls the same state files `status` reads and shells out to the same `start`/`stop` logic, so it never needs to be running for the background services to keep working, and closing it never stops them:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe tray
+```
+The tray menu offers "Start/Stop Discord" and "Start/Stop Web" toggles, a plain "Quit" that just removes the icon (services keep running), and a "Stop All & Quit" that gracefully stops both before exiting.
 
 The other four `cmd/` entry points remain standalone single-purpose binaries — useful as isolated testing grounds for their respective `core/interface/*` packages:
 *   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
@@ -131,4 +142,6 @@ The other four `cmd/` entry points remain standalone single-purpose binaries —
 *   `google.golang.org/genai`: Google Gemini API client.
 *   `github.com/gorilla/mux`: Mux router for custom API routing.
 *   `github.com/bwmarrin/discordgo`: Discord API bindings for Go.
+*   `github.com/spf13/cobra`: CLI command/flag framework powering `botson-full`.
+*   `github.com/getlantern/systray`: Cross-platform system tray icon (used for the Windows `tray` subcommand).
 *   `gorm.io/gorm`: ORM backing SQL database persistence.

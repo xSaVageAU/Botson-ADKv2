@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"time"
 
 	"botsonv2/core/interface/discord"
 	webui "botsonv2/core/interface/web"
@@ -14,6 +17,9 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher/web/a2a"
 	"google.golang.org/adk/v2/cmd/launcher/web/api"
 )
+
+const webDaemonName = "web"
+const webDisplayName = "Web server"
 
 func newWebCmd() *cobra.Command {
 	var port int
@@ -30,7 +36,102 @@ func newWebCmd() *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
 	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
 	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
+
+	cmd.AddCommand(newWebStartCmd(), newWebStopCmd(), newWebStatusCmd(), newWebDaemonChildCmd())
 	return cmd
+}
+
+// webDaemonChildArgs builds the argv used to relaunch this executable as the
+// detached __daemon-child process, carrying the same flags the user passed.
+func webDaemonChildArgs(port int, otelToCloud, withDiscord bool) []string {
+	return []string{
+		"web", "__daemon-child",
+		"--port=" + strconv.Itoa(port),
+		"--otel_to_cloud=" + strconv.FormatBool(otelToCloud),
+		"--discord=" + strconv.FormatBool(withDiscord),
+	}
+}
+
+// newWebDaemonChildCmd is the hidden entrypoint the detached background
+// process actually runs; users invoke `start`/`stop`/`status` instead.
+func newWebDaemonChildCmd() *cobra.Command {
+	var port int
+	var otelToCloud bool
+	var withDiscord bool
+
+	cmd := &cobra.Command{
+		Use:    "__daemon-child",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			daemonCtx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			ln, ctrlPort, err := startControlListener(cancel)
+			if err != nil {
+				return fmt.Errorf("failed to start control listener: %w", err)
+			}
+			defer ln.Close()
+
+			if err := writeDaemonState(webDaemonName, daemonState{
+				PID:       os.Getpid(),
+				Port:      ctrlPort,
+				StartedAt: time.Now(),
+			}); err != nil {
+				return fmt.Errorf("failed to write daemon state: %w", err)
+			}
+			defer removeDaemonState(webDaemonName)
+
+			return runWeb(daemonCtx, port, otelToCloud, withDiscord)
+		},
+	}
+	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
+	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
+	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
+	return cmd
+}
+
+func newWebStartCmd() *cobra.Command {
+	var port int
+	var otelToCloud bool
+	var withDiscord bool
+
+	cmd := &cobra.Command{
+		Use:               "start",
+		Short:             "Start the web console as a detached background process",
+		PersistentPreRunE: noBootstrap,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return startDaemon(webDaemonName, webDisplayName, webDaemonChildArgs(port, otelToCloud, withDiscord))
+		},
+	}
+	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
+	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
+	cmd.Flags().BoolVar(&withDiscord, "discord", false, "Start the background Discord Gateway alongside the web server")
+	return cmd
+}
+
+func newWebStopCmd() *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:               "stop",
+		Short:             "Stop the background web server",
+		PersistentPreRunE: noBootstrap,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return stopDaemon(webDaemonName, webDisplayName, force)
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "Force-kill the background process instead of asking it to shut down gracefully")
+	return cmd
+}
+
+func newWebStatusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:               "status",
+		Short:             "Show whether the background web server is running",
+		PersistentPreRunE: noBootstrap,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return printDaemonStatus(webDaemonName, webDisplayName)
+		},
+	}
 }
 
 func runWeb(ctx context.Context, port int, otelToCloud, withDiscord bool) error {
