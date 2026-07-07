@@ -140,6 +140,10 @@ window.switchView = async function (viewName) {
     if (typeof window.loadAgentsForBuilder === 'function') {
       await window.loadAgentsForBuilder();
     }
+  } else if (viewName === 'workflows') {
+    if (typeof window.loadWorkflows === 'function') {
+      await window.loadWorkflows();
+    }
   } else if (viewName === 'settings') {
     if (typeof window.loadSettings === 'function') {
       await window.loadSettings();

@@ -11,6 +11,8 @@ import (
 //go:embed default_agents/*
 var defaultAgentsFS embed.FS
 
+var activeDynamicLoader *DynamicLoader
+
 // LoadDefaultAgents initializes and returns the dynamic agent.Loader.
 // It loads both the embedded default agents and any custom agents in ~/.botsonv2/agents/.
 func LoadDefaultAgents(model model.LLM) (agent.Loader, error) {
@@ -18,7 +20,20 @@ func LoadDefaultAgents(model model.LLM) (agent.Loader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return LoadAllAgents(subFS, model)
+	delegate, err := LoadAllAgents(subFS, model)
+	if err != nil {
+		return nil, err
+	}
+	activeDynamicLoader = NewDynamicLoader(subFS, model, delegate)
+	return activeDynamicLoader, nil
+}
+
+// ReloadAgents triggers a re-parsing of all agent configuration directories on disk.
+func ReloadAgents() error {
+	if activeDynamicLoader != nil {
+		return activeDynamicLoader.Reload()
+	}
+	return nil
 }
 
 // GetDefaultAgentsFS returns the embedded default agents filesystem.

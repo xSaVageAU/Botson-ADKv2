@@ -20,6 +20,9 @@ func setupAPIRoutes(r *mux.Router, configLauncher *launcher.Config) {
 
 	// Register Agent Config Builder Routes
 	registerBuilderRoutes(r)
+
+	// Register Workflow Studio Routes
+	registerWorkflowRoutes(r)
 }
 
 // StartServer starts a standalone server listening on the specified port.

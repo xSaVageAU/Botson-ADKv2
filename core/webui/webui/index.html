@@ -15,6 +15,7 @@
   <script src="/botson/static/js/dashboard.js" defer></script>
   <script src="/botson/static/js/chat.js" defer></script>
   <script src="/botson/static/js/builder.js" defer></script>
+  <script src="/botson/static/js/workflow_studio.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -38,6 +39,10 @@
         <button class="nav-btn" id="tab-builder" onclick="switchView('builder')">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">Agent Builder</span>
+        </button>
+        <button class="nav-btn" id="tab-workflows" onclick="switchView('workflows')">
+          <span class="nav-icon">🌿</span>
+          <span class="nav-text">Workflow Studio</span>
         </button>
         <button class="nav-btn" id="tab-settings" onclick="switchView('settings')">
           <span class="nav-icon">🔧</span>
@@ -303,6 +308,75 @@
             
             <div class="editor-container" id="builder-editor" style="display: none;">
               <!-- Populated dynamically via renderForm in JS -->
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <!-- ==================== WORKFLOWS VIEW ==================== -->
+      <div class="view-panel" id="view-workflows" style="display: none;">
+        <div class="sub-layout">
+          <!-- Left Rail: Workflows List -->
+          <aside class="sub-rail">
+            <div class="rail-header-text">Workflow Studio</div>
+            <button class="btn btn-primary btn-new-action" onclick="window.newWorkflow()">
+              <span class="plus" aria-hidden="true">+</span> New workflow
+            </button>
+            <div class="rail-list-head">
+              <span>Workflows</span>
+              <span class="rail-list-count" id="workflowCount">0</span>
+            </div>
+            <ul class="node-list" id="workflowList">
+              <!-- Populated dynamically -->
+            </ul>
+            <div class="rail-foot">
+              writes to <code>~/.botsonv2/workflows/</code>
+            </div>
+          </aside>
+
+          <!-- Main Pane: Visual Canvas -->
+          <main class="builder-pane" id="workflowWorkspace" style="position: relative; overflow: hidden; padding: 0;">
+            <div class="welcome" id="workflow-welcome" style="padding: 40px;">
+              <h2>Workflow Orchestration</h2>
+              <p>Create a multi-agent workflow graph. Select a workflow from the sidebar or click "New workflow" to start dragging, connecting, and testing nodes.</p>
+            </div>
+
+            <div class="editor-container" id="workflow-editor" style="display: none; height: 100%; display: flex; flex-direction: column; position: relative;">
+              <!-- Header / Actions -->
+              <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); z-index: 10;">
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <input type="text" id="workflowNameInput" placeholder="Workflow Name" style="font-size: 16px; font-weight: 600; background: transparent; border: none; outline: none; border-bottom: 1px dashed var(--border); color: var(--text); padding: 4px;">
+                  <input type="text" id="workflowDescInput" placeholder="Short description..." style="font-size: 13px; color: var(--text-muted); background: transparent; border: none; outline: none; width: 300px; border-bottom: 1px dashed var(--border); padding: 4px;">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" onclick="window.addNodeToCanvas('agent')">+ Add Agent Node</button>
+                  <button class="btn btn-secondary" onclick="window.addNodeToCanvas('tool')">+ Add Tool Node</button>
+                  <button class="btn btn-primary" onclick="window.saveWorkflow()">Save Workflow</button>
+                  <button class="btn btn-danger" onclick="window.deleteWorkflow()" style="background: var(--danger); border: none; color: white;">Delete</button>
+                </div>
+              </div>
+
+              <!-- Main Canvas Area -->
+              <div id="workflowCanvasContainer" style="flex: 1; position: relative; background: var(--bg); background-image: radial-gradient(var(--border) 1px, transparent 0); background-size: 24px 24px; overflow: hidden; cursor: grab;">
+                <!-- SVG Connector Layer -->
+                <svg id="workflowSVG" style="position: absolute; top: 0; left: 0; width: 10000px; height: 10000px; pointer-events: none; z-index: 1;"></svg>
+                <!-- Dotted Canvas -->
+                <div id="workflowCanvas" style="position: absolute; top: 0; left: 0; width: 10000px; height: 10000px; transform-origin: 0 0; z-index: 2;">
+                  <!-- Nodes dynamically appended here -->
+                </div>
+              </div>
+
+              <!-- Inspector Panel (Side drawer) -->
+              <div id="nodeInspector" style="position: absolute; right: 0; top: 58px; bottom: 0; width: 300px; background: var(--panel); border-left: 1px solid var(--border); box-shadow: var(--shadow); z-index: 20; display: none; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <h3 id="inspectorNodeTitle" style="margin: 0;">Configure Node</h3>
+                  <button class="btn btn-secondary" onclick="window.closeInspector()" style="padding: 4px 8px; font-size: 11px;">Close</button>
+                </div>
+                <hr style="border: none; border-top: 1px solid var(--border); margin: 0;">
+                <div id="inspectorContent" style="display: flex; flex-direction: column; gap: 12px;">
+                  <!-- Dynamic content (dropdowns etc.) -->
+                </div>
+              </div>
             </div>
           </main>
         </div>
