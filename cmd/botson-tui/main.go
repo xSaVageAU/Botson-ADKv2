@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"reflect"
 	"syscall"
+	"unsafe"
 
 	"botsonv2/core/agent"
 	coreartifact "botsonv2/core/artifact"
@@ -26,6 +28,8 @@ import (
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/model/gemini"
 	"google.golang.org/genai"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // Package-level program reference to send background messages
@@ -60,6 +64,13 @@ type model struct {
 }
 
 func main() {
+	// Redirect standard logger to a file to prevent polluting terminal interface
+	logFile, errLog := os.OpenFile("tui.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if errLog == nil {
+		log.SetOutput(logFile)
+		defer logFile.Close()
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -121,6 +132,7 @@ func main() {
 		fmt.Printf("Error loading session database: %v\n", err)
 		os.Exit(1)
 	}
+	silenceGormLogger(dbSessionService)
 
 	localArtifactService, err := coreartifact.NewLocalFileService(dataDir)
 	if err != nil {
@@ -352,4 +364,25 @@ func (m model) View() string {
 
 	// AltScreen Container
 	return m.containerStyle.Width(m.width - 6).Height(m.height - 4).Render(sb.String())
+}
+
+func silenceGormLogger(service interface{}) {
+	val := reflect.ValueOf(service)
+	if val.Kind() != reflect.Ptr {
+		return
+	}
+	val = val.Elem()
+	if val.Type().Name() != "databaseService" {
+		return
+	}
+	dbField := val.FieldByName("db")
+	if !dbField.IsValid() {
+		return
+	}
+
+	ptr := unsafe.Pointer(dbField.UnsafeAddr())
+	gormDB := *(**gorm.DB)(ptr)
+	if gormDB != nil {
+		gormDB.Logger = gormlogger.Default.LogMode(gormlogger.Silent)
+	}
 }
