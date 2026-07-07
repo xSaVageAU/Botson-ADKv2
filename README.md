@@ -9,7 +9,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
 ## Project Structure
 
 *   **`/cmd`**: Contains project application entry points. Five standalone applications, each a testing ground / entry point for one interface; `botson-full` is the only one meant to combine them into a single seamless deployment.
-    *   **[`/botson-full`](./cmd/botson-full/)**: The end-result application — combines the custom web console, REST & A2A APIs, and (optionally) the Discord Gateway into one seamless server. Does not include the built-in ADK web launcher.
+    *   **[`/botson-full`](./cmd/botson-full/)**: The end-result application — a Cobra CLI with `tui` (default), `web`, and `discord` subcommands, so one binary can boot a chat session, the custom web console + REST/A2A APIs, or the Discord Gateway. Does not include the built-in ADK web launcher.
     *   **[`/botson-web`](./cmd/botson-web/)**: Boots a standalone instance of just the custom unified console SPA (dashboard, chat, agent builder), without APIs or Discord.
     *   **[`/botson-discord`](./cmd/botson-discord/)**: Starts a standalone Discord Gateway bot listener.
     *   **[`/botson-tui`](./cmd/botson-tui/)**: Standalone terminal-based chat client (Bubble Tea), used as a testing ground for `core/interface/tui`.
@@ -48,7 +48,7 @@ The application provides a modular approach to building, running, and analyzing 
 *   **Discord Gateway Integration**: Connect with your agent registry from anywhere. Whitelisted users can start multiple persistent chat sessions, view active session details, and select past histories with easy-to-use slash commands.
 *   **Interactive Human-in-the-Loop (HITL)**: Requires authorization confirmations before execution of specific tools. The bot renders interactive button elements to the console or Discord DMs so administrators can approve or deny actions dynamically.
 *   **Concerns Separation**: Frontend code resides in CSS/JS modules (`main.css`, `dashboard.css`, `chat.css`, `builder.css`, and matching JS files). Backend endpoints are split into `api_dashboard.go` and `api_builder.go`.
-*   **Frictionless CLI Flags**: Standard flags (like `-port 9000`) can be passed to `botson-full` directly, while ADK-specific routing commands are automatically handled internally.
+*   **Multi-Purpose CLI**: `botson-full` is a Cobra-based CLI with `tui` (default), `web`, and `discord` subcommands, each with their own flags (e.g. `web --port 9000`), while ADK-specific routing commands are automatically handled internally.
 *   **Multi-Agent Registry & GORM Sessions**: Save custom agents dynamically to `~/.botsonv2/agents/` and maintain conversation states, artifacts, and telemetry spans in an SQLite db.
 
 ---
@@ -86,11 +86,17 @@ Compile the platform-specific binaries into the `/bin` folder:
     ```
 
 ### 3. Running
-Run the appropriate entry point depending on your use case:
-*   **Full Application** (REST/A2A APIs + Unified Console + optional Discord Gateway, on port `:8080`):
-	```powershell
-	go run cmd/botson-full/main.go -port=8080
-	```
+
+`botson-full` is a single multi-purpose CLI/TUI binary with subcommands, built on Cobra. Run it with no arguments (or `tui`) to boot straight into a chat session; use `web` or `discord` to run those interfaces instead:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe             # same as `... tui` - interactive terminal chat
+./bin/botsonv2-full-windows-amd64.exe tui --agent "Some Agent"
+./bin/botsonv2-full-windows-amd64.exe web --port=8080 --discord
+./bin/botsonv2-full-windows-amd64.exe discord
+./bin/botsonv2-full-windows-amd64.exe --help       # list all commands and flags
+```
+
+The other four `cmd/` entry points remain standalone single-purpose binaries — useful as isolated testing grounds for their respective `core/interface/*` packages:
 *   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
 	```powershell
 	go run cmd/botson-web/main.go
