@@ -335,13 +335,25 @@ func (m model) runAgentStream(text string) {
 }
 
 func (m model) renderHistory() string {
+	width := m.viewport.Width
+	if width <= 0 {
+		width = 80
+	}
+	wrapStyle := lipgloss.NewStyle().Width(width)
+
 	var sb strings.Builder
-	sb.WriteString(strings.Join(m.history, "\n\n"))
+	for i, item := range m.history {
+		if i > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString(wrapStyle.Render(item))
+	}
 	if m.thinking {
 		if sb.Len() > 0 {
 			sb.WriteString("\n\n")
 		}
-		sb.WriteString(m.agentStyle.Render(fmt.Sprintf("[%s] > ", m.agentName)) + m.streamingOutput.String())
+		agentPrefix := m.agentStyle.Render(fmt.Sprintf("[%s] > ", m.agentName))
+		sb.WriteString(wrapStyle.Render(agentPrefix + m.streamingOutput.String()))
 	}
 	return sb.String()
 }
@@ -363,7 +375,7 @@ func (m model) View() string {
 	}
 
 	// AltScreen Container
-	return m.containerStyle.Width(m.width - 6).Height(m.height - 4).Render(sb.String())
+	return m.containerStyle.Width(m.width - 6).Render(sb.String())
 }
 
 func silenceGormLogger(service interface{}) {
