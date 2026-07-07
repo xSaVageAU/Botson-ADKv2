@@ -23,7 +23,7 @@ func setupAPIRoutes(r *mux.Router, configLauncher *launcher.Config) {
 }
 
 // StartServer starts a standalone server listening on the specified port.
-// This is used for cmd/agent-builder standalone execution.
+// This is used for cmd/botson-web standalone execution.
 func StartServer(port string) error {
 	muxRouter := mux.NewRouter()
 

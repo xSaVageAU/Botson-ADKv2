@@ -32,11 +32,11 @@ func main() {
 		name string
 		dir  string
 	}{
-		{"botsonv2-adk", "cmd/botson-adk"},
-		{"botsonv2-builder", "cmd/agent-builder"},
-		{"botsonv2-prod", "cmd/botson-prod"},
+		{"botsonv2-full", "cmd/botson-full"},
+		{"botsonv2-web", "cmd/botson-web"},
 		{"botsonv2-discord", "cmd/botson-discord"},
 		{"botsonv2-tui", "cmd/botson-tui"},
+		{"botsonv2-adk", "cmd/botson-adk"},
 	}
 
 	var wg sync.WaitGroup

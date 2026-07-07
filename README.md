@@ -8,12 +8,12 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
 
 ## Project Structure
 
-*   **`/cmd`**: Contains project application entry points.
-    *   **[`/botson-prod`](./cmd/botson-prod/)**: Starts the production server (REST & A2A APIs) and serves the custom unified console SPA.
-    *   **[`/botson-adk`](./cmd/botson-adk/)**: Starts the standard, built-in Google ADK developer console.
-    *   **[`/botson-discord`](./cmd/botson-discord/)**: Starts the production Discord Gateway bot listener.
-    *   **[`/botson-tui`](./cmd/botson-tui/)**: Renders a full terminal-based chat client (Bubble Tea SPA).
-    *   **[`/agent-builder`](./cmd/agent-builder/)**: Boots a standalone local editor for quickly building and editing agent configurations.
+*   **`/cmd`**: Contains project application entry points. Five standalone applications, each a testing ground / entry point for one interface; `botson-full` is the only one meant to combine them into a single seamless deployment.
+    *   **[`/botson-full`](./cmd/botson-full/)**: The end-result application — combines the custom web console, REST & A2A APIs, and (optionally) the Discord Gateway into one seamless server. Does not include the built-in ADK web launcher.
+    *   **[`/botson-web`](./cmd/botson-web/)**: Boots a standalone instance of just the custom unified console SPA (dashboard, chat, agent builder), without APIs or Discord.
+    *   **[`/botson-discord`](./cmd/botson-discord/)**: Starts a standalone Discord Gateway bot listener.
+    *   **[`/botson-tui`](./cmd/botson-tui/)**: Standalone terminal-based chat client (Bubble Tea), used as a testing ground for `core/interface/tui`.
+    *   **[`/botson-adk`](./cmd/botson-adk/)**: Starts only the standard, built-in Google ADK developer console/web launcher and APIs — kept separate from `botson-full`.
 *   **`/core`**: Main application packages.
     *   **[`/agent`](./core/agent/)**: Custom recursive agent loader, default definitions, and tool registry.
     *   **[`/artifact`](./core/artifact/)**: Local file system service for persistent artifacts.
@@ -21,6 +21,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
     *   **[`/interface`](./core/interface/)**: Unified system interfaces.
         *   **[`/web`](./core/interface/web/)**: Serves the unified SPA console. Includes embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), and sublauncher routing.
         *   **[`/discord`](./core/interface/discord/)**: Coordinates the Discord Gateway listener, command handles (`commands.go`), security locks (`handlers.go`), database/disk session persistence (`sessions.go`), and Human-in-the-Loop confirms (`hitl.go`).
+        *   **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
     *   **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation states.
     *   **[`/tools`](./core/tools/)**: Secure tools (`listFiles`, `readFile`, `loadArtifacts`, `saveArtifact`).
 
@@ -31,7 +32,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
 The application provides a modular approach to building, running, and analyzing AI agents:
 
 1.  **Registry Loading**: Default agents (bundled with system resources) and custom user agents (from `~/.botsonv2/agents/`) are parsed and built recursively. This allows configuring tools and sub-agent delegation.
-2.  **Server Hosting**: The `botson-prod` application runs the ADK web server. It handles REST requests (`/api/*`), message stream runtimes (`/api/run_sse`), and serves the console SPA on `/botson/`.
+2.  **Server Hosting**: The `botson-full` application runs the ADK web server. It handles REST requests (`/api/*`), message stream runtimes (`/api/run_sse`), and serves the console SPA on `/botson/`.
 3.  **Discord Gateway listening**: The `botson-discord` application logs into Discord, registers slash commands (`/new`, `/list`, `/select`, `/info`, `/approve`), and starts checking incoming messages.
 4.  **Unified Frontend Console**: The browser SPA runs a single stylesheet and script architecture separated into modular concerns:
     *   `main`: Toggles active views and controls the app layout.
@@ -47,7 +48,7 @@ The application provides a modular approach to building, running, and analyzing 
 *   **Discord Gateway Integration**: Connect with your agent registry from anywhere. Whitelisted users can start multiple persistent chat sessions, view active session details, and select past histories with easy-to-use slash commands.
 *   **Interactive Human-in-the-Loop (HITL)**: Requires authorization confirmations before execution of specific tools. The bot renders interactive button elements to the console or Discord DMs so administrators can approve or deny actions dynamically.
 *   **Concerns Separation**: Frontend code resides in CSS/JS modules (`main.css`, `dashboard.css`, `chat.css`, `builder.css`, and matching JS files). Backend endpoints are split into `api_dashboard.go` and `api_builder.go`.
-*   **Frictionless CLI Flags**: Standard flags (like `-port 9000`) can be passed to `botson-prod` directly, while ADK-specific routing commands are automatically handled internally.
+*   **Frictionless CLI Flags**: Standard flags (like `-port 9000`) can be passed to `botson-full` directly, while ADK-specific routing commands are automatically handled internally.
 *   **Multi-Agent Registry & GORM Sessions**: Save custom agents dynamically to `~/.botsonv2/agents/` and maintain conversation states, artifacts, and telemetry spans in an SQLite db.
 
 ---
@@ -86,25 +87,25 @@ Compile the platform-specific binaries into the `/bin` folder:
 
 ### 3. Running
 Run the appropriate entry point depending on your use case:
-*   **Production Server & Unified Console** (REST APIs + Unified UI on port `:8080`):
+*   **Full Application** (REST/A2A APIs + Unified Console + optional Discord Gateway, on port `:8080`):
 	```powershell
-	go run cmd/botson-prod/main.go -port=8080
+	go run cmd/botson-full/main.go -port=8080
 	```
-*   **Production Discord Bot Gateway** (Discord integration listener):
+*   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
+	```powershell
+	go run cmd/botson-web/main.go
+	```
+*   **Standalone Discord Bot Gateway** (Discord integration listener only):
 	```powershell
 	go run cmd/botson-discord/main.go
-	```
-*   **Standard ADK Developer Console** (Standard ADK internal console):
-	```powershell
-	go run cmd/botson-adk/main.go
 	```
 *   **Interactive Terminal Console (TUI)** (Bubble Tea command-line interface):
 	```powershell
 	go run cmd/botson-tui/main.go
 	```
-*   **Standalone Agent Config Builder** (Lightweight configuration editor on port `:8081`):
+*   **Standard ADK Developer Console** (Built-in ADK web launcher & APIs only):
 	```powershell
-	go run cmd/agent-builder/main.go
+	go run cmd/botson-adk/main.go
 	```
 
 ---

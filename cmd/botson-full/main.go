@@ -127,7 +127,7 @@ func main() {
 	}
 
 	// Execute the Unified REST & UI Web server
-	fmt.Printf("Starting production server on http://localhost:%d... please do not close this window.\n", *portFlag)
+	fmt.Printf("Starting Botson Full server on http://localhost:%d... please do not close this window.\n", *portFlag)
 	
 	args := []string{
 		"web",
@@ -140,7 +140,7 @@ func main() {
 		if ctx.Err() != nil {
 			log.Println("Server stopped gracefully via signal.")
 		} else {
-			log.Printf("Production server execution failed: %v\n", err)
+			log.Printf("Full server execution failed: %v\n", err)
 			fmt.Println("Press Enter to exit...")
 			fmt.Scanln()
 			os.Exit(1)
