@@ -31,8 +31,9 @@ var availableTools = map[string]toolBuilder{
 	},
 	"saveArtifact": func() (tool.Tool, error) {
 		return functiontool.New(functiontool.Config{
-			Name:        "saveArtifact",
-			Description: "Saves a text artifact in the current session (e.g. plans, logs, code, or structured documents).",
+			Name:                "saveArtifact",
+			Description:         "Saves a text artifact in the current session (e.g. plans, logs, code, or structured documents).",
+			RequireConfirmation: true,
 		}, tools.SaveArtifact)
 	},
 }

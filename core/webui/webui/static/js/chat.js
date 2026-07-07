@@ -148,18 +148,62 @@ window.selectSession = async function(sessionId) {
     document.getElementById('activeAgentName').textContent = title;
     document.getElementById('activeAgentSub').textContent = `SESSION: ${window.activeAgent}`;
 
+    // Enable chat input initially
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+      chatInput.disabled = false;
+      chatInput.placeholder = "Type a message... (Ctrl+Enter to send)";
+    }
+
     if (sessionData.events && sessionData.events.length > 0) {
       const logEl = document.getElementById('chatLog');
       logEl.innerHTML = ''; // clear welcome
 
+      // 1. Scan chronologically to identify which adk_request_confirmation calls have been answered
+      const answeredConfirmations = {};
+      sessionData.events.forEach(ev => {
+        if (ev.content && ev.content.parts) {
+          ev.content.parts.forEach(part => {
+            if (part.functionResponse && part.functionResponse.name === 'adk_request_confirmation') {
+              const callId = part.functionResponse.id;
+              const resp = part.functionResponse.response || {};
+              answeredConfirmations[callId] = {
+                confirmed: resp.confirmed === true || resp.confirmed === 'true',
+                responder: ev.author
+              };
+            }
+          });
+        }
+      });
+
+      // 2. Render all events
       sessionData.events.forEach(ev => {
         if (ev.author === 'user' && ev.content && ev.content.parts) {
-          ev.content.parts.forEach(part => {
-            if (part.text) window.appendMessage('user', part.text);
-          });
+          // Only render standard text messages from user, skipping function responses
+          let textParts = ev.content.parts.filter(part => part.text);
+          if (textParts.length > 0) {
+            textParts.forEach(part => {
+              window.appendMessage('user', part.text);
+            });
+          }
         } else if (ev.author === window.activeAgent && ev.content && ev.content.parts) {
           ev.content.parts.forEach(part => {
-            if (part.text) window.appendMessage('agent', part.text);
+            if (part.text) {
+              window.appendMessage('agent', part.text);
+            }
+            if (part.functionCall) {
+              if (part.functionCall.name === 'adk_request_confirmation') {
+                const callId = part.functionCall.id;
+                if (answeredConfirmations[callId]) {
+                  window.appendHitlResolved(part.functionCall, answeredConfirmations[callId].confirmed);
+                } else {
+                  window.appendHitlPending(part.functionCall);
+                }
+              } else {
+                // Render standard tool call indication
+                window.appendToolCallIndication(part.functionCall.name);
+              }
+            }
           });
         } else if (ev.output && ev.nodeInfo) {
           window.appendToolTrace(ev.nodeInfo.nodeName, ev.output);
@@ -626,4 +670,187 @@ window.appendToolTrace = function(name, output) {
   row.appendChild(card);
   logEl.appendChild(row);
   logEl.scrollTop = logEl.scrollHeight;
+};
+
+window.appendToolCallIndication = function(toolName) {
+  const logEl = document.getElementById('chatLog');
+  if (!logEl) return;
+  const row = document.createElement('div');
+  row.className = 'message-row system';
+  row.innerHTML = `<div style="font-size: 12px; color: var(--text-faint); font-style: italic; padding: 4px 8px;">⚙️ Agent is executing tool: <code>${toolName}</code>...</div>`;
+  logEl.appendChild(row);
+  logEl.scrollTop = logEl.scrollHeight;
+};
+
+window.appendHitlResolved = function(fc, confirmed) {
+  const logEl = document.getElementById('chatLog');
+  if (!logEl) return;
+
+  const row = document.createElement('div');
+  row.className = 'message-row system';
+
+  const card = document.createElement('div');
+  card.className = 'hitl-card';
+  card.style.borderColor = confirmed ? 'var(--green)' : 'var(--danger)';
+
+  const header = document.createElement('div');
+  header.className = 'hitl-header';
+  header.innerHTML = `⚙️ Resolved Tool Call: <code>${fc.args.originalFunctionCall?.name || 'tool'}</code>`;
+  
+  const status = document.createElement('div');
+  status.className = confirmed ? 'hitl-status hitl-status-approved' : 'hitl-status hitl-status-denied';
+  status.textContent = confirmed ? '✓ Execution Approved' : '✗ Execution Denied';
+  
+  card.appendChild(header);
+  card.appendChild(status);
+  row.appendChild(card);
+  logEl.appendChild(row);
+  logEl.scrollTop = logEl.scrollHeight;
+};
+
+window.appendHitlPending = function(fc) {
+  const logEl = document.getElementById('chatLog');
+  if (!logEl) return;
+
+  const row = document.createElement('div');
+  row.className = 'message-row system';
+
+  const card = document.createElement('div');
+  card.className = 'hitl-card';
+  card.id = `hitl-${fc.id}`;
+
+  const header = document.createElement('div');
+  header.className = 'hitl-header';
+  header.innerHTML = `⚠️ Agent Requesting Permission`;
+
+  const body = document.createElement('div');
+  body.className = 'hitl-body';
+  body.textContent = fc.args.hint || 'The agent requires approval to execute this tool.';
+
+  const details = document.createElement('pre');
+  details.className = 'hitl-details';
+  details.textContent = JSON.stringify(fc.args.originalFunctionCall || {}, null, 2);
+
+  const actions = document.createElement('div');
+  actions.className = 'hitl-actions';
+
+  const approveBtn = document.createElement('button');
+  approveBtn.className = 'hitl-btn hitl-btn-approve';
+  approveBtn.textContent = 'Approve';
+  approveBtn.onclick = () => window.sendConfirmation(fc.id, true);
+
+  const denyBtn = document.createElement('button');
+  denyBtn.className = 'hitl-btn hitl-btn-deny';
+  denyBtn.textContent = 'Deny';
+  denyBtn.onclick = () => window.sendConfirmation(fc.id, false);
+
+  actions.appendChild(approveBtn);
+  actions.appendChild(denyBtn);
+
+  card.appendChild(header);
+  card.appendChild(body);
+  card.appendChild(details);
+  card.appendChild(actions);
+  row.appendChild(card);
+
+  logEl.appendChild(row);
+  logEl.scrollTop = logEl.scrollHeight;
+
+  // Disable chat input
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput) {
+    chatInput.disabled = true;
+    chatInput.placeholder = "Agent is waiting for approval...";
+  }
+};
+
+window.sendConfirmation = async function(callId, confirmed) {
+  const indicator = document.getElementById('typingIndicator');
+  if (indicator) indicator.classList.add('active');
+
+  // Disable verification buttons
+  document.querySelectorAll('.hitl-btn').forEach(btn => btn.disabled = true);
+
+  const payload = {
+    appName: window.activeAgent,
+    userId: window.currentUser,
+    sessionId: window.activeSessionId,
+    newMessage: {
+      role: 'user',
+      parts: [{
+        functionResponse: {
+          name: 'adk_request_confirmation',
+          id: callId,
+          response: {
+            confirmed: confirmed
+          }
+        }
+      }]
+    }
+  };
+
+  try {
+    const res = await fetch('/api/run_sse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errMsg = await res.text();
+      throw new Error(errMsg || 'Failed to submit confirmation');
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let agentMessageBubble = null;
+
+    if (indicator) indicator.classList.remove('active');
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.substring(6).trim();
+          if (jsonStr) {
+            try {
+              const event = JSON.parse(jsonStr);
+
+              if (event.author === window.activeAgent && event.content && event.content.parts) {
+                event.content.parts.forEach(part => {
+                  if (part.text) {
+                    if (!agentMessageBubble) {
+                      agentMessageBubble = window.appendMessagePlaceholder('agent');
+                    }
+                    window.updateMessageBubble(agentMessageBubble, part.text);
+                  }
+                });
+              }
+
+              if (event.output && event.nodeInfo) {
+                window.appendToolTrace(event.nodeInfo.nodeName, event.output);
+              }
+            } catch (err) {
+              console.error('SSE parsing error:', err, jsonStr);
+            }
+          }
+        }
+      }
+      buffer = lines[lines.length - 1];
+    }
+  } catch (err) {
+    if (indicator) indicator.classList.remove('active');
+    window.showToast(`Confirmation failed: ${err.message}`, 'error');
+  } finally {
+    // Reload history to update cards status
+    await window.loadSessionDetails(window.activeSessionId);
+    await window.loadSessions();
+  }
 };
