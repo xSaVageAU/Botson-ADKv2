@@ -19,6 +19,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
     *   **[`/artifact`](./core/artifact/)**: Local file system service for persistent artifacts.
     *   **[`/config`](./core/config/)**: Handles configurations and workspace path lookups.
     *   **[`/daemon`](./core/daemon/)**: Generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) shared by every backgroundable subcommand (`discord`, `web`, `tray`) in `botson-full`.
+    *   **[`/setup`](./core/setup/)**: Backs `botson-full setup install/uninstall/reset` — interactive prompts, installing the binary to `~/.botsonv2/bin` and onto PATH, and (Windows) tray-autostart registration.
     *   **[`/interface`](./core/interface/)**: Unified system interfaces.
         *   **[`/web`](./core/interface/web/)**: Serves the unified SPA console. Includes embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), and sublauncher routing.
         *   **[`/discord`](./core/interface/discord/)**: Coordinates the Discord Gateway listener, command handles (`commands.go`), security locks (`handlers.go`), database/disk session persistence (`sessions.go`), Human-in-the-Loop confirms (`hitl.go`), and disk-persisted pending-authorization requests (`pending.go`).
@@ -52,6 +53,7 @@ The application provides a modular approach to building, running, and analyzing 
 *   **Concerns Separation**: Frontend code resides in CSS/JS modules (`main.css`, `dashboard.css`, `chat.css`, `builder.css`, and matching JS files). Backend endpoints are split into `api_dashboard.go` and `api_builder.go`.
 *   **Multi-Purpose CLI**: `botson-full` is a Cobra-based CLI with `tui` (default), `web`, and `discord` subcommands, each with their own flags (e.g. `web --port 9000`), while ADK-specific routing commands are automatically handled internally.
 *   **Background Services & System Tray**: `web` and `discord` can each run as a detached background process with `start`/`stop`/`status` subcommands, and (on Windows) a `tray` subcommand shows both as a system tray icon with one-click start/stop.
+*   **First-Run Setup Wizard**: `setup install` interactively configures Botson and puts it on PATH; `setup uninstall`/`reset` handle teardown and starting over on config/data.
 *   **Multi-Agent Registry & GORM Sessions**: Save custom agents dynamically to `~/.botsonv2/agents/` and maintain conversation states, artifacts, and telemetry spans in an SQLite db.
 
 ---
@@ -90,6 +92,12 @@ Compile the platform-specific binaries into the `/bin` folder:
 
 ### 3. Running
 
+The recommended first step on a new machine is `setup install` — an interactive wizard that asks for your Gemini API key, root agent, and (optional) Discord token/owner, then copies the binary to `~/.botsonv2/bin` and adds it to your PATH so plain `botson` works from any terminal afterward:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe setup install
+```
+On Windows it also offers to register the tray icon to start automatically at login. Re-running `install` later (e.g. after downloading a newer build) detects your existing configuration and asks before overwriting it, so it's safe to use as a repair/update step too.
+
 `botson-full` is a single multi-purpose CLI/TUI binary with subcommands, built on Cobra. Run it with no arguments (or `tui`) to boot straight into a chat session; use `web` or `discord` to run those interfaces instead:
 ```powershell
 ./bin/botsonv2-full-windows-amd64.exe             # same as `... tui` - interactive terminal chat
@@ -127,6 +135,13 @@ The tray menu offers "Start/Stop Discord" and "Start/Stop Web" toggles, a plain 
 ```
 Logs and state follow the same convention: `~/.botsonv2/logs/tray.log` and `~/.botsonv2/tray.pid`.
 
+`setup` also has `uninstall` and `reset`, rounding out the machine lifecycle alongside `install`:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe setup uninstall  # one confirmation, then automatic
+./bin/botsonv2-full-windows-amd64.exe setup reset       # interactive, per-category keep/replace
+```
+`uninstall` stops any running `discord`/`web`/`tray` daemons, removes the PATH entry and tray-autostart registration, and deletes the installed binary — it never touches `~/.botsonv2` (config, sessions, custom agents), so your data survives a reinstall. `reset` asks per category ("Keep your Gemini API key?", "Keep your Discord settings?") whether to keep or immediately replace each one — reusing the same prompts `install` uses — and separately, defaulting to *no*, whether to also wipe session history and custom agents. Either way it ends with a valid, saved config, ready to run right away.
+
 The other four `cmd/` entry points remain standalone single-purpose binaries — useful as isolated testing grounds for their respective `core/interface/*` packages:
 *   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
 	```powershell
@@ -155,4 +170,5 @@ The other four `cmd/` entry points remain standalone single-purpose binaries —
 *   `github.com/bwmarrin/discordgo`: Discord API bindings for Go.
 *   `github.com/spf13/cobra`: CLI command/flag framework powering `botson-full`.
 *   `github.com/getlantern/systray`: Cross-platform system tray icon (used for the Windows `tray` subcommand).
+*   `golang.org/x/term`: Masked (password-style) terminal input for `setup install`/`reset`'s API key and Discord token prompts.
 *   `gorm.io/gorm`: ORM backing SQL database persistence.

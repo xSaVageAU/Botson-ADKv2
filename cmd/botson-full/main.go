@@ -43,7 +43,7 @@ func main() {
 	}
 	rootCmd.PersistentFlags().StringVar(&agentFlag, "agent", "", "Agent name to chat with (defaults to the configured root agent)")
 
-	rootCmd.AddCommand(newTUICmd(), newWebCmd(), newDiscordCmd(), newTrayCmd())
+	rootCmd.AddCommand(newTUICmd(), newWebCmd(), newDiscordCmd(), newTrayCmd(), newSetupCmd())
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
