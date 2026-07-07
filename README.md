@@ -94,7 +94,7 @@ The recommended first step on a new machine is `setup install` — an interactiv
 ```powershell
 ./bin/botsonv2-windows-amd64.exe setup install
 ```
-On Windows it also offers to register the tray icon to start automatically at login. Re-running `install` later (e.g. after downloading a newer build) detects your existing configuration and asks before overwriting it, so it's safe to use as a repair/update step too.
+On Windows it also offers to register the tray icon to start automatically at login, and separately offers to start it right now. Re-running `install` later (e.g. after downloading a newer build) detects your existing configuration and asks before overwriting it, so it's safe to use as a repair/update step too.
 
 `botson` is a single multi-purpose CLI/TUI binary with subcommands, built on Cobra. Run it with no arguments (or `tui`) to boot straight into a chat session; use `web` or `discord` to run those interfaces instead:
 ```powershell

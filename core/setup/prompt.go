@@ -36,23 +36,53 @@ func ReadLine(label, defaultVal string) (string, error) {
 	return line, nil
 }
 
-// ReadMasked prompts for a line of input without echoing it to the
-// terminal, for secrets (API keys, bot tokens). Falls back to a plain,
-// visible read if the input isn't a real terminal (piped/redirected
-// stdin) rather than failing outright, since raw mode has nothing to
-// attach to in that case.
+// ReadMasked prompts for a line of input, echoing a `*` per keystroke
+// rather than the actual characters -- enough to see that typing or
+// pasting actually registered, without revealing the secret itself.
+// Falls back to a plain, visible read if the input isn't a real terminal
+// (piped/redirected stdin), since raw mode has nothing to attach to in
+// that case.
 func ReadMasked(label string) (string, error) {
 	fmt.Printf("%s: ", label)
-	if data, err := term.ReadPassword(int(os.Stdin.Fd())); err == nil {
-		fmt.Println()
-		return strings.TrimSpace(string(data)), nil
-	}
 
-	line, err := stdin.ReadString('\n')
+	fd := int(os.Stdin.Fd())
+	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		return "", fmt.Errorf("failed to read input: %w", err)
+		line, err := stdin.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read input: %w", err)
+		}
+		return strings.TrimSpace(line), nil
 	}
-	return strings.TrimSpace(line), nil
+	defer term.Restore(fd, oldState)
+
+	// Raw mode disables the terminal's own newline translation, so use
+	// explicit \r\n rather than relying on fmt.Println here.
+	var buf []byte
+	for {
+		b, err := stdin.ReadByte()
+		if err != nil {
+			fmt.Print("\r\n")
+			return "", fmt.Errorf("failed to read input: %w", err)
+		}
+
+		switch b {
+		case '\r', '\n':
+			fmt.Print("\r\n")
+			return strings.TrimSpace(string(buf)), nil
+		case 3: // Ctrl+C
+			fmt.Print("\r\n")
+			return "", fmt.Errorf("input cancelled")
+		case 127, 8: // Backspace/Delete
+			if len(buf) > 0 {
+				buf = buf[:len(buf)-1]
+				fmt.Print("\b \b")
+			}
+		default:
+			buf = append(buf, b)
+			fmt.Print("*")
+		}
+	}
 }
 
 // AskYesNo prompts a yes/no question. An empty answer takes defaultYes.

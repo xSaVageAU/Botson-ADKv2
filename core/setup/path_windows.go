@@ -4,11 +4,15 @@ package setup
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows/registry"
+
+	"botsonv2/core/config"
 )
 
 const (
@@ -40,6 +44,34 @@ func broadcastEnvironmentChange() {
 	)
 }
 
+// writePathBackup saves the pre-change PATH value to a file rather than
+// dumping it to the console -- a file survives after the terminal closes
+// and doesn't clutter the interactive install flow with a long raw
+// semicolon-separated line, while still giving you something to manually
+// restore from if a PATH edit ever needs undoing outside of `setup
+// uninstall`.
+func writePathBackup(current string) error {
+	dataDir, err := config.GetDataDir()
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Backup of your user PATH (HKCU\\Environment\\Path) taken by `botson setup install`\n")
+	sb.WriteString("before it appended its own install directory.\n\n")
+	sb.WriteString("Entries:\n")
+	for _, entry := range strings.Split(current, ";") {
+		if entry == "" {
+			continue
+		}
+		sb.WriteString("  " + entry + "\n")
+	}
+	sb.WriteString("\nRaw value (for restoring via `reg add HKCU\\Environment /v Path /t REG_EXPAND_SZ /d \"...\" /f`):\n")
+	sb.WriteString(current + "\n")
+
+	return os.WriteFile(filepath.Join(dataDir, "path_backup.txt"), []byte(sb.String()), 0644)
+}
+
 // AddToPath appends dir to the current user's PATH (HKCU\Environment), if
 // it isn't already present.
 func AddToPath(dir string) error {
@@ -60,7 +92,11 @@ func AddToPath(dir string) error {
 		}
 	}
 
-	fmt.Printf("Current user PATH (before change): %s\n", current)
+	if err := writePathBackup(current); err != nil {
+		fmt.Printf("Warning: failed to back up current PATH: %v\n", err)
+	} else {
+		fmt.Println("Backed up your current PATH to ~/.botsonv2/path_backup.txt before modifying it.")
+	}
 
 	updated := dir
 	if current != "" {

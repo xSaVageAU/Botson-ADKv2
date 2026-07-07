@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"botsonv2/core/config"
+	"botsonv2/core/daemon"
 	"botsonv2/core/management"
 )
 
@@ -71,6 +72,18 @@ func Install(ctx context.Context) error {
 				fmt.Printf("Warning: failed to register tray autostart: %v\n", err)
 			} else {
 				fmt.Println("Tray icon will start automatically at login.")
+			}
+		}
+
+		startNow, err := AskYesNo("Start the Botson tray icon now?", true)
+		if err != nil {
+			return err
+		}
+		if startNow {
+			if _, _, err := daemon.Start("tray", "Tray icon", []string{"tray", "__daemon-child"}); err != nil {
+				fmt.Printf("Warning: failed to start the tray icon: %v\n", err)
+			} else {
+				fmt.Println("Tray icon started.")
 			}
 		}
 	}
