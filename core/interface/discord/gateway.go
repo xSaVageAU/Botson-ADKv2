@@ -154,6 +154,16 @@ func (g *Gateway) Start() error {
 			rootAgentName = rootAgent.Name()
 		}
 
+		activeSessionID := "None"
+		dm, dmErr := g.session.UserChannelCreate(cfg.Discord.OwnerID)
+		if dmErr == nil {
+			g.mu.RLock()
+			if sessID, ok := g.activeSessions[dm.ID]; ok && sessID != "" {
+				activeSessionID = sessID
+			}
+			g.mu.RUnlock()
+		}
+
 		embed := &discordgo.MessageEmbed{
 			Title:       "🟢 Botson Gateway Online",
 			Color:       0x10B981,
@@ -161,6 +171,7 @@ func (g *Gateway) Start() error {
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "Host System", Value: fmt.Sprintf("`%s`", hostOS), Inline: true},
 				{Name: "Default Agent", Value: fmt.Sprintf("`%s`", rootAgentName), Inline: true},
+				{Name: "Active Session ID", Value: fmt.Sprintf("`%s`", activeSessionID), Inline: false},
 			},
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
@@ -174,12 +185,23 @@ func (g *Gateway) Close() error {
 	// Send Shutdown DM to owner if configured
 	cfg, err := config.Load()
 	if err == nil && cfg.Discord.OwnerID != "" {
+		activeSessionID := "None"
+		dm, dmErr := g.session.UserChannelCreate(cfg.Discord.OwnerID)
+		if dmErr == nil {
+			g.mu.RLock()
+			if sessID, ok := g.activeSessions[dm.ID]; ok && sessID != "" {
+				activeSessionID = sessID
+			}
+			g.mu.RUnlock()
+		}
+
 		embed := &discordgo.MessageEmbed{
 			Title:       "🔴 Botson Gateway Offline",
 			Color:       0xEF4444,
 			Description: "Your Botson Workspace Console gateway is shutting down gracefully.",
 			Fields: []*discordgo.MessageEmbedField{
-				{Name: "Exit Status", Value: "`Clean Shutdown`", Inline: false},
+				{Name: "Exit Status", Value: "`Clean Shutdown`", Inline: true},
+				{Name: "Active Session ID", Value: fmt.Sprintf("`%s`", activeSessionID), Inline: true},
 			},
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
