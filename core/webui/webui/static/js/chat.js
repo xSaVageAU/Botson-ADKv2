@@ -394,6 +394,7 @@ window.sendMessage = async function() {
     await window.loadArtifacts();
     await window.loadTelemetry();
     await window.loadSessions();
+    await window.selectSession(window.activeSessionId);
   } catch (err) {
     if (indicator) indicator.classList.remove('active');
     window.showToast(err.message, 'error');
@@ -850,7 +851,7 @@ window.sendConfirmation = async function(callId, confirmed) {
     window.showToast(`Confirmation failed: ${err.message}`, 'error');
   } finally {
     // Reload history to update cards status
-    await window.loadSessionDetails(window.activeSessionId);
+    await window.selectSession(window.activeSessionId);
     await window.loadSessions();
   }
 };
