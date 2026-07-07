@@ -17,26 +17,31 @@ import (
 // take it off PATH") instead of as one all-or-nothing operation. Deleting
 // the binary is treated as the actual "uninstall": only then does it ask
 // whether to keep config.json, and wipe everything else under
-// ~/.botsonv2 either way. full skips that keep-config question and
-// deletes it too.
-func Uninstall(ctx context.Context, full bool) error {
+// ~/.botsonv2 either way. If forceFull is true, none of these questions
+// are asked at all -- every step runs and config.json is deleted too, for
+// a completely unattended full wipe.
+func Uninstall(ctx context.Context, forceFull bool) error {
 	fmt.Println("Botson Setup - Uninstall")
 	fmt.Println("=========================")
 
-	removePath, err := AskYesNo("Remove Botson from PATH?", true)
+	if forceFull {
+		fmt.Println("--force-full-uninstall: skipping all prompts, removing everything.")
+	}
+
+	removePath, err := confirmStep(forceFull, "Remove Botson from PATH?")
 	if err != nil {
 		return err
 	}
 
 	removeStartup := false
 	if runtime.GOOS == "windows" {
-		removeStartup, err = AskYesNo("Remove Botson from Startup (tray autostart at login)?", true)
+		removeStartup, err = confirmStep(forceFull, "Remove Botson from Startup (tray autostart at login)?")
 		if err != nil {
 			return err
 		}
 	}
 
-	removeBinary, err := AskYesNo("Delete the installed binary?", true)
+	removeBinary, err := confirmStep(forceFull, "Delete the installed binary?")
 	if err != nil {
 		return err
 	}
@@ -80,8 +85,8 @@ func Uninstall(ctx context.Context, full bool) error {
 		return nil
 	}
 
-	deleteConfig := full
-	if !full {
+	deleteConfig := forceFull
+	if !forceFull {
 		keepConfig, err := AskYesNo("Do you want to keep your config.json file? Everything else will be deleted.", true)
 		if err != nil {
 			return err
@@ -145,6 +150,17 @@ func wipeDataDir(deleteConfig bool) error {
 	}
 
 	return nil
+}
+
+// confirmStep asks label (defaulting to yes) unless forceFull is set, in
+// which case it returns true immediately without prompting -- shared by
+// every yes/no step in Uninstall so --force-full-uninstall skips all of
+// them uniformly.
+func confirmStep(forceFull bool, label string) (bool, error) {
+	if forceFull {
+		return true, nil
+	}
+	return AskYesNo(label, true)
 }
 
 // stopDaemonQuietly stops a background daemon if it's running, falling
