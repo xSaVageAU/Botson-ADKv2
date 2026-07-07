@@ -11,45 +11,73 @@ import (
 	"botsonv2/core/daemon"
 )
 
-// Uninstall stops any running background daemons, removes the tray
-// autostart registration, PATH entry, and installed binary. Unless full is
-// true, it then asks whether to keep config.json, deleting everything else
-// under ~/.botsonv2 (sessions, custom agents, logs) either way; full skips
-// that question and deletes config.json too.
+// Uninstall asks, step by step, which parts of the installation to remove
+// -- the PATH entry, the tray autostart registration (Windows), and the
+// installed binary -- so any one of them can be done alone (e.g. "just
+// take it off PATH") instead of as one all-or-nothing operation. Deleting
+// the binary is treated as the actual "uninstall": only then does it ask
+// whether to keep config.json, and wipe everything else under
+// ~/.botsonv2 either way. full skips that keep-config question and
+// deletes it too.
 func Uninstall(ctx context.Context, full bool) error {
-	confirmed, err := AskYesNo("Are you sure you want to uninstall Botson? This will delete the PATH/Startup and installed binary.", false)
+	fmt.Println("Botson Setup - Uninstall")
+	fmt.Println("=========================")
+
+	removePath, err := AskYesNo("Remove Botson from PATH?", true)
 	if err != nil {
 		return err
 	}
-	if !confirmed {
-		fmt.Println("Uninstall cancelled.")
-		return nil
-	}
 
-	stopDaemonQuietly("discord", "Discord gateway")
-	stopDaemonQuietly("web", "Web server")
-	stopDaemonQuietly("tray", "Tray icon")
-
+	removeStartup := false
 	if runtime.GOOS == "windows" {
-		if err := UnregisterTrayAutostart(); err != nil {
-			fmt.Printf("Warning: failed to remove tray autostart entry: %v\n", err)
+		removeStartup, err = AskYesNo("Remove Botson from Startup (tray autostart at login)?", true)
+		if err != nil {
+			return err
 		}
 	}
 
-	installDir, err := InstallDir()
+	removeBinary, err := AskYesNo("Delete the installed binary?", true)
 	if err != nil {
 		return err
-	}
-	if err := RemoveFromPath(installDir); err != nil {
-		fmt.Printf("Warning: failed to remove PATH entry automatically: %v\n", err)
 	}
 
-	binPath, err := InstalledBinaryPath()
-	if err != nil {
-		return err
+	if !removePath && !removeStartup && !removeBinary {
+		fmt.Println("Nothing selected; uninstall cancelled.")
+		return nil
 	}
-	if err := removeInstalledBinary(binPath); err != nil {
-		return fmt.Errorf("failed to remove installed binary: %w", err)
+
+	if removeBinary {
+		// Daemons hold their own handle on the same installed binary, so
+		// they need to stop before it can be deleted; not needed for the
+		// lighter PATH/Startup-only paths.
+		stopDaemonQuietly("discord", "Discord gateway")
+		stopDaemonQuietly("web", "Web server")
+		stopDaemonQuietly("tray", "Tray icon")
+	}
+
+	if removeStartup {
+		if err := UnregisterTrayAutostart(); err != nil {
+			fmt.Printf("Warning: failed to remove tray autostart entry: %v\n", err)
+		} else {
+			fmt.Println("Removed from Startup.")
+		}
+	}
+
+	if removePath {
+		installDir, err := InstallDir()
+		if err != nil {
+			return err
+		}
+		if err := RemoveFromPath(installDir); err != nil {
+			fmt.Printf("Warning: failed to remove PATH entry automatically: %v\n", err)
+		} else {
+			fmt.Println("Removed from PATH.")
+		}
+	}
+
+	if !removeBinary {
+		fmt.Println("Done.")
+		return nil
 	}
 
 	deleteConfig := full
@@ -63,6 +91,21 @@ func Uninstall(ctx context.Context, full bool) error {
 
 	if err := wipeDataDir(deleteConfig); err != nil {
 		return err
+	}
+
+	// Scheduled last, right before returning: on Windows this process is
+	// usually the installed binary itself, so the file can't actually be
+	// deleted until this process exits -- the background helper retries
+	// in a loop until then. Scheduling it here (rather than earlier)
+	// keeps that retry window to roughly "until this process exits",
+	// instead of "for as long as the user takes to answer prompts after
+	// this point".
+	binPath, err := InstalledBinaryPath()
+	if err != nil {
+		return err
+	}
+	if err := removeInstalledBinary(binPath); err != nil {
+		return fmt.Errorf("failed to remove installed binary: %w", err)
 	}
 
 	if deleteConfig {

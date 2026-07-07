@@ -34,7 +34,7 @@ func newSetupUninstallCmd() *cobra.Command {
 	var full bool
 	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove Botson from PATH/startup, delete the installed binary, and clear data",
+		Short: "Selectively remove Botson from PATH/startup and/or delete the installed binary and data",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return setup.Uninstall(cmd.Context(), full)
 		},

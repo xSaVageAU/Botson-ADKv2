@@ -10,7 +10,13 @@ import (
 	"syscall"
 )
 
-const detachedProcessFlag = 0x00000008
+// CREATE_NO_WINDOW isn't exposed as a named constant in the syscall
+// package, so its documented raw value is used directly here. Unlike
+// DETACHED_PROCESS (no console at all), this gives the helper a hidden
+// console that its own `ping` retry-delay calls can inherit -- with no
+// console to inherit, Windows allocates ping.exe a brand new, visible one
+// on every retry, which is what caused the popup-window flashing.
+const createNoWindow = 0x08000000
 
 // scheduleSelfDelete spawns a short detached helper that waits for this
 // process to exit, then deletes path. Windows won't let a running process
@@ -42,7 +48,7 @@ func scheduleSelfDelete(path string) error {
 
 	cmd := exec.Command("cmd", "/C", batPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcessFlag,
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | createNoWindow,
 	}
 	return cmd.Start()
 }
