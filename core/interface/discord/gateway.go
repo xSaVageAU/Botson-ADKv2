@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -34,11 +36,57 @@ func New(token string, config *launcher.Config) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{
+	g := &Gateway{
 		session:        dg,
 		config:         config,
 		activeSessions: make(map[string]string),
-	}, nil
+	}
+	g.loadActiveSessions()
+	return g, nil
+}
+
+func (g *Gateway) saveActiveSessions() error {
+	dataDir, err := config.GetDataDir()
+	if err != nil {
+		return err
+	}
+	filePath := filepath.Join(dataDir, "discord_active_sessions.json")
+
+	g.mu.RLock()
+	data, err := json.MarshalIndent(g.activeSessions, "", "  ")
+	g.mu.RUnlock()
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filePath, data, 0644)
+}
+
+func (g *Gateway) loadActiveSessions() {
+	dataDir, err := config.GetDataDir()
+	if err != nil {
+		log.Printf("Discord Warning: failed to resolve data directory: %v", err)
+		return
+	}
+	filePath := filepath.Join(dataDir, "discord_active_sessions.json")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Printf("Discord Warning: failed to read active sessions file: %v", err)
+		return
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err := json.Unmarshal(data, &g.activeSessions); err != nil {
+		log.Printf("Discord Warning: failed to parse active sessions JSON: %v", err)
+	} else {
+		log.Printf("Discord Info: successfully loaded %d active sessions from disk.", len(g.activeSessions))
+	}
 }
 
 func (g *Gateway) Start() error {
@@ -372,6 +420,7 @@ func (g *Gateway) executeNewCommand(s *discordgo.Session, i *discordgo.Interacti
 	g.mu.Lock()
 	g.activeSessions[channelID] = newSessionID
 	g.mu.Unlock()
+	_ = g.saveActiveSessions()
 
 	oldText := oldSessionID
 	if oldText == "" {
@@ -468,6 +517,7 @@ func (g *Gateway) executeSelectCommand(s *discordgo.Session, i *discordgo.Intera
 	oldSessionID := g.activeSessions[channelID]
 	g.activeSessions[channelID] = selectedSession.ID()
 	g.mu.Unlock()
+	_ = g.saveActiveSessions()
 
 	oldText := oldSessionID
 	if oldText == "" {
@@ -668,6 +718,7 @@ func (g *Gateway) resolveSessionID(ctx context.Context, channelID string, agentN
 		g.mu.Lock()
 		g.activeSessions[channelID] = sessionID
 		g.mu.Unlock()
+		_ = g.saveActiveSessions()
 		return sessionID, nil
 	}
 
@@ -691,6 +742,7 @@ func (g *Gateway) resolveSessionID(ctx context.Context, channelID string, agentN
 	g.mu.Lock()
 	g.activeSessions[channelID] = sessionID
 	g.mu.Unlock()
+	_ = g.saveActiveSessions()
 
 	return sessionID, nil
 }
