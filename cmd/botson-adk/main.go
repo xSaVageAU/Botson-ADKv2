@@ -14,13 +14,8 @@ import (
 
 	"google.golang.org/genai"
 
-	"botsonv2/core/webui"
-
 	"google.golang.org/adk/v2/cmd/launcher"
-	"google.golang.org/adk/v2/cmd/launcher/universal"
-	"google.golang.org/adk/v2/cmd/launcher/web"
-	"google.golang.org/adk/v2/cmd/launcher/web/a2a"
-	"google.golang.org/adk/v2/cmd/launcher/web/api"
+	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
 )
 
@@ -89,18 +84,12 @@ func main() {
 		AgentLoader:     loader,
 	}
 
-	adkLauncher := universal.NewLauncher(
-		web.NewLauncher(
-			api.NewLauncher(),
-			a2a.NewLauncher(),
-			webui.NewSublauncher(),
-		),
-	)
+	adkLauncher := full.NewLauncher()
 
 	fmt.Println("Starting standard ADK Console/Web UI server... please do not close this window.")
 	
 	// Pass standard arguments to boot the default web console and REST API
-	args := []string{"web", "api", "a2a", "botson"}
+	args := []string{"web", "api", "webui"}
 
 	if err = adkLauncher.Execute(ctx, configLauncher, args); err != nil {
 		if ctx.Err() != nil {
