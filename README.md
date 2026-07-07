@@ -12,6 +12,7 @@ The project features a **Unified Workspace Console Single Page Application (SPA)
     *   **[`/botson-prod`](./cmd/botson-prod/)**: Starts the production server (REST & A2A APIs) and serves the custom unified console SPA.
     *   **[`/botson-adk`](./cmd/botson-adk/)**: Starts the standard, built-in Google ADK developer console.
     *   **[`/botson-discord`](./cmd/botson-discord/)**: Starts the production Discord Gateway bot listener.
+    *   **[`/botson-tui`](./cmd/botson-tui/)**: Renders a full terminal-based chat client (Bubble Tea SPA).
     *   **[`/agent-builder`](./cmd/agent-builder/)**: Boots a standalone local editor for quickly building and editing agent configurations.
 *   **`/core`**: Main application packages.
     *   **[`/agent`](./core/agent/)**: Custom recursive agent loader, default definitions, and tool registry.
@@ -92,6 +93,10 @@ Run the appropriate entry point depending on your use case:
 *   **Standard ADK Developer Console** (Standard ADK internal console):
 	```powershell
 	go run cmd/botson-adk/main.go
+	```
+*   **Interactive Terminal Console (TUI)** (Bubble Tea command-line interface):
+	```powershell
+	go run cmd/botson-tui/main.go
 	```
 *   **Standalone Agent Config Builder** (Lightweight configuration editor on port `:8081`):
 	```powershell

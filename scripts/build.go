@@ -37,6 +37,7 @@ func main() {
 		{"botsonv2-builder", "cmd/agent-builder"},
 		{"botsonv2-prod", "cmd/botson-prod"},
 		{"botsonv2-discord", "cmd/botson-discord"},
+		{"botsonv2-tui", "cmd/botson-tui"},
 	}
 
 	var wg sync.WaitGroup
