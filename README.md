@@ -92,9 +92,18 @@ Compile the platform-specific binaries into the `/bin` folder:
 ./bin/botsonv2-full-windows-amd64.exe             # same as `... tui` - interactive terminal chat
 ./bin/botsonv2-full-windows-amd64.exe tui --agent "Some Agent"
 ./bin/botsonv2-full-windows-amd64.exe web --port=8080 --discord
-./bin/botsonv2-full-windows-amd64.exe discord
+./bin/botsonv2-full-windows-amd64.exe discord      # foreground, tied to this terminal
 ./bin/botsonv2-full-windows-amd64.exe --help       # list all commands and flags
 ```
+
+`discord` also supports running as a detached background process, independent of the terminal, with a PID-file-backed lifecycle so it can be checked on and stopped later:
+```powershell
+./bin/botsonv2-full-windows-amd64.exe discord start          # detach and run in the background
+./bin/botsonv2-full-windows-amd64.exe discord status          # check if it's running
+./bin/botsonv2-full-windows-amd64.exe discord stop            # ask it to shut down gracefully
+./bin/botsonv2-full-windows-amd64.exe discord stop --force    # hard-kill if it won't respond
+```
+Background logs go to `~/.botsonv2/logs/discord.log`, and lifecycle state to `~/.botsonv2/discord.pid`. Since Windows has no way to deliver a graceful shutdown signal to an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this also works identically on Linux.
 
 The other four `cmd/` entry points remain standalone single-purpose binaries — useful as isolated testing grounds for their respective `core/interface/*` packages:
 *   **Standalone Web Console** (Just the unified console SPA, on port `:8081`):
