@@ -126,15 +126,6 @@ func main() {
 		}
 	}
 
-	// Handle graceful shutdown of background bot
-	go func() {
-		<-ctx.Done()
-		if mgr.IsRunning() {
-			log.Println("Shutting down background Discord Gateway...")
-			_ = mgr.Stop()
-		}
-	}()
-
 	// Execute the Unified REST & UI Web server
 	fmt.Printf("Starting production server on http://localhost:%d... please do not close this window.\n", *portFlag)
 	
@@ -154,5 +145,11 @@ func main() {
 			fmt.Scanln()
 			os.Exit(1)
 		}
+	}
+
+	// Stop the Discord Gateway synchronously before the process terminates
+	if mgr.IsRunning() {
+		log.Println("Shutting down background Discord Gateway...")
+		_ = mgr.Stop()
 	}
 }
