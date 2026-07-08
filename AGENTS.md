@@ -46,6 +46,7 @@ Historically, `botson tui`, `botson web`, and `botson discord` were three fully 
 - **HITL in the TUI**: this thin-client rewrite also closed a pre-existing gap — the old TUI had no confirmation UI at all, so a `RequireConfirmation: true` tool call silently stalled forever. `core/interface/tui/io.go` now special-cases `FunctionCall.Name == "adk_request_confirmation"` (see "HITL confirmation wire protocol" below) and `tui.go`'s `Update()` gains `y`/`n` keybindings active only while a confirmation is pending.
 - **Discord is an in-process, togglable singleton**, not a separate daemon. `core/interface/discord/singleton.go` holds a package-level `active *Gateway` behind a mutex (`InitCore`/`StartGateway`/`StopGateway`/`GatewayStatus`) — starting/stopping Discord is now just spinning a goroutine + discordgo session up or down within the core, no new OS process. `core/management/discord_daemon.go` keeps its historical exported names (`StartDiscordDaemon`/`StopDiscordDaemon`/`DiscordDaemonStatus`) so `core/interface/web/api_dashboard.go`'s `/discord/start|stop|status` handlers (and the web console's existing Start/Stop buttons) needed zero changes — only the implementation underneath swapped. The `toggleDiscord` agent tool (`core/tools/toggle_discord.go`, `RequireConfirmation: true`) calls `core/interface/discord` **directly**, not through `core/management` — routing through `management` would create an import cycle (`core/tools` → `core/management` → `core/agent` → `core/tools`), so this is the one place Discord control bypasses the `management` layer other callers use. See "Conventions" for the import-direction rule this follows.
 - **`botson discord start/stop/status`** now retarget to whichever core is running, over HTTP (`core/interface/apiclient`'s Discord methods against `/botson/api/discord/*`), erroring clearly if no core is running rather than silently falling back to spawning a standalone process. Bare `botson discord` (no subcommand) is unchanged — still a genuinely standalone, foreground, core-independent process for anyone who wants Discord fully isolated (e.g. on a different machine).
+- **The tray (Windows-only) and `setup status` follow the same rule.** `tray_windows.go`'s Discord menu item calls `discordCoreClient()` (shared with `cmd_discord.go`) instead of `daemon.Start/Stop` against a `"discord"` daemon id that no longer exists — this was actually a latent Windows build break introduced when Phase 3 removed that id, only caught by `GOOS=windows go build ./...` cross-compilation (no Windows machine is available to catch it any other way; there's no CI gate for this yet, so re-run that cross-compile after touching anything under `cmd/botson` with a `_windows.go` file). `core/setup/status.go`'s "Background services" report queries the running core's `/botson/api/discord/status` for Discord's row instead of a `.pid` file that no longer exists, falling back to "not running (core isn't running)" if there's no core to ask.
 - **Known limitation, not solved by this**: switching an *already-running* core's workspace directory. It's pinned for that process's lifetime — restart it from a new directory to change it. True per-session/per-tool-call workspace switching would require threading a workspace argument through `agent.Context` and every tool built on `os.Getwd()`, a materially bigger change than this.
 
 ## Bare `botson` dispatch
@@ -145,7 +146,7 @@ Logs: `~/.botsonv2/logs/web.log`. State: `~/.botsonv2/web.pid`. Since Windows ha
 botson discord start / status / stop
 ```
 
-On Windows, `tray` mirrors and controls the web core via the same state files/logic (`tray`, `tray start/status/stop [--force]`) — closing the tray never stops the core, since it's just another client of the same daemon state.
+On Windows, `tray` mirrors and controls the web core via the same state files/logic (`tray`, `tray start/status/stop [--force]`) — closing the tray never stops the core, since it's just another client of the same daemon state. Its Discord menu item is a thin HTTP toggle against the core's `/botson/api/discord/*`, same as the CLI's `discord start/stop/status`.
 
 ### Setup lifecycle: uninstall / reset / status
 
@@ -159,7 +160,7 @@ botson setup status                           # read-only report on install/PATH
 
 `reset` asks per-category ("keep your Gemini API key?", "keep your Discord settings?") whether to keep or replace, reusing `install`'s own prompt functions, and separately (defaulting to *no*) whether to wipe session history and custom agents. Always ends with a valid, saved config.
 
-`status` makes no changes — reports whether the Gemini key/Discord/root agent are configured, whether the binary is installed and on PATH, tray autostart registration, and whether `discord`/`web`/`tray` are currently running.
+`status` makes no changes — reports whether the Gemini key/Discord/root agent are configured, whether the binary is installed and on PATH, tray autostart registration, and whether `web`/`tray` are currently running plus (queried from a running core, if any) Discord's status.
 
 ### Settings
 
