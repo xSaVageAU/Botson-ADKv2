@@ -43,6 +43,20 @@ var availableTools = map[string]toolBuilder{
 			RequireConfirmation: true,
 		}, tools.UpdateSettings)
 	},
+	"writeFile": func() (tool.Tool, error) {
+		return functiontool.New(functiontool.Config{
+			Name:                "writeFile",
+			Description:         "Writes (creates or overwrites) a file at the given path within the project workspace, creating parent directories as needed.",
+			RequireConfirmation: true,
+		}, tools.WriteFile)
+	},
+	"runCommand": func() (tool.Tool, error) {
+		return functiontool.New(functiontool.Config{
+			Name:                "runCommand",
+			Description:         "Runs a shell command in the project workspace and returns its stdout, stderr, and exit code. Use for builds, tests, git, and other CLI operations.",
+			RequireConfirmation: true,
+		}, tools.RunCommand)
+	},
 }
 
 // GetAvailableTools returns the sorted list of all registered tool names in the registry.

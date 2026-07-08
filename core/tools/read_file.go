@@ -3,8 +3,6 @@ package tools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"google.golang.org/adk/v2/agent"
 )
@@ -21,28 +19,9 @@ type ReadFileResult struct {
 
 // ReadFile allows the agent to read the content of a specific file.
 func ReadFile(ctx agent.Context, args ReadFileArgs) (ReadFileResult, error) {
-	root, err := os.Getwd()
+	fullPath, err := resolveWorkspacePath(args.FilePath)
 	if err != nil {
-		return ReadFileResult{}, fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	// Clean and secure path construction to avoid directory traversal
-	cleanedPath := filepath.Clean(args.FilePath)
-	
-	// Ensure path is relative or absolute inside the project
-	fullPath := cleanedPath
-	if !filepath.IsAbs(cleanedPath) {
-		fullPath = filepath.Join(root, cleanedPath)
-	}
-
-	if !strings.HasPrefix(fullPath, root) {
-		return ReadFileResult{}, fmt.Errorf("access denied: file path must be inside project workspace")
-	}
-
-	// Block access to the loaded .env file (case-insensitive check)
-	loadedEnvPath := filepath.Clean(filepath.Join(root, ".env"))
-	if strings.EqualFold(filepath.Clean(fullPath), loadedEnvPath) {
-		return ReadFileResult{}, fmt.Errorf("access denied: cannot read configuration environment file")
+		return ReadFileResult{}, err
 	}
 
 	content, err := os.ReadFile(fullPath)

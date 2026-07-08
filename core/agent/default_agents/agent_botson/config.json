@@ -6,6 +6,8 @@
     "readFile",
     "saveArtifact",
     "loadArtifacts",
-    "updateSettings"
+    "updateSettings",
+    "writeFile",
+    "runCommand"
   ]
 }
