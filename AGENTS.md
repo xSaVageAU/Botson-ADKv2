@@ -2,7 +2,7 @@
 
 This file orients AI coding agents (and human maintainers doing a deep dive) working in this codebase. For a short, human-facing project overview, see [README.md](./README.md).
 
-Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the same agent/session/artifact backend through three interfaces (TUI, web console, Discord) from one primary binary, `botson`.
+Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the same agent/session/artifact backend through three interfaces (TUI, web console, Discord) from one primary binary, `botson`. As of 2026-07, these three interfaces share **one unified core process** rather than each independently bootstrapping their own copy of the Gemini model/agent registry/session state — see "Unified core architecture" below.
 
 ---
 
@@ -16,28 +16,41 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
   - **[`/agent`](./core/agent/)**: custom recursive agent loader, default definitions, and tool registry.
   - **[`/artifact`](./core/artifact/)**: local file system service for persistent artifacts.
   - **[`/config`](./core/config/)**: `AppConfig` struct, load/save/update, and workspace path lookups (`~/.botsonv2/`). `Load` caches a single shared instance per process and `Update` mutates it in place (see "Self-configuration" below) — this is the one package every settings-reading/writing code path (CLI, web API, agent tool) ultimately goes through, so it can't import `core/management`, `core/agent`, or `core/tools` without creating a cycle.
-  - **[`/daemon`](./core/daemon/)**: generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) shared by every backgroundable subcommand (`discord`, `web`, `tray`).
+  - **[`/daemon`](./core/daemon/)**: generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) shared by every backgroundable subcommand (`web`, `tray`) — `discord` used to be one too, but is now an in-process toggle of a running `web` core instead (see "Unified core architecture" below).
   - **[`/setup`](./core/setup/)**: backs `botson setup install/uninstall/reset/status` — prompts (interactive and flag-driven), installing the binary to `~/.botsonv2/bin` and onto PATH, (Windows) tray-autostart registration, and a read-only status report.
-  - **[`/interface`](./core/interface/)**: the three user-facing interfaces.
-    - **[`/web`](./core/interface/web/)**: serves the unified SPA console — embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), sublauncher routing.
-    - **[`/discord`](./core/interface/discord/)**: Discord Gateway listener, command handlers (`commands.go`), security locks (`handlers.go`), DB/disk session persistence (`sessions.go`), HITL confirms (`hitl.go`), disk-persisted pending-authorization requests (`pending.go`).
-    - **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
-  - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, sessions, config, dashboard stats, Discord daemon control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions. `ListSessions`/`GetSession`/`DeleteSession` (`sessions.go`) only need a `session.Service`, not the full Gemini/agent-loader bootstrap `GetDashboardStats` needs — same reasoning as `ListAgents`.
+  - **[`/interface`](./core/interface/)**: the three user-facing interfaces, plus the client package thin interfaces use to talk to the core.
+    - **[`/web`](./core/interface/web/)**: serves the unified SPA console — embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), sublauncher routing. `botson web` is the unified core process: this is where the REST/A2A APIs, the console, and (via `discord.InitCore`) the Discord gateway singleton all actually run.
+    - **[`/discord`](./core/interface/discord/)**: Discord Gateway listener, command handlers (`commands.go`), security locks (`handlers.go`), DB/disk session persistence (`sessions.go`), HITL confirms (`hitl.go`), disk-persisted pending-authorization requests (`pending.go`), and the in-process gateway singleton (`singleton.go`) — see "Unified core architecture" below.
+    - **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. A thin client of a running core (see below) — it holds an `*apiclient.Client`, not its own runner/agent loader.
+    - **[`/apiclient`](./core/interface/apiclient/)**: minimal HTTP/SSE client over the core's REST API (`DefaultAgent`, `CreateSession`, `Run`, plus Discord toggle/status), used by the TUI and by `botson discord start/stop/status` so those don't need their own Gemini/agent bootstrap.
+  - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, sessions, config, dashboard stats, Discord gateway control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions. `ListSessions`/`GetSession`/`DeleteSession` (`sessions.go`) only need a `session.Service`, not the full Gemini/agent-loader bootstrap `GetDashboardStats` needs — same reasoning as `ListAgents`. `discord_daemon.go` keeps its historical name and exported signatures (`StartDiscordDaemon`/`StopDiscordDaemon`/`DiscordDaemonStatus`) even though Discord is no longer a separate daemon process underneath — see "Unified core architecture" below.
   - **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation state. `InitPersistentSessionService` silences GORM's default logger (it writes to stdout, not stderr) at construction, since every consumer -- CLI JSON output, the TUI's alt-screen -- would otherwise get corrupted by it; don't reintroduce a per-consumer workaround for this (the TUI used to have one, an unsafe-reflection hack, removed once this was fixed at the source). See [docs/sessions.md](./docs/sessions.md) for the full schema/API reference.
-  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `writeFile`, `editFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`, `runCommand`, `saveScript`, `runScript`). `readFile`/`writeFile`/`editFile` share path validation via `resolveWorkspacePath` (`workspace.go`) — the one place that confines a tool to the workspace root and blocks `.env` access, so fix path-safety bugs there rather than per-tool.
+  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `writeFile`, `editFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`, `runCommand`, `saveScript`, `runScript`, `toggleDiscord`). `readFile`/`writeFile`/`editFile` share path validation via `resolveWorkspacePath` (`workspace.go`) — the one place that confines a tool to the workspace root and blocks `.env` access, so fix path-safety bugs there rather than per-tool.
   - **[`/procutil`](./core/procutil/)**: `Run(ctx, name, args, opts)` — runs a subprocess with a timeout that actually works (kills the whole process group, not just the direct child) and truncates captured output. Leaf package (only depends on the stdlib), shared by `core/tools`' `runCommand` and `core/scripts`' script runner so this exec-safety logic exists in exactly one place.
   - **[`/scripts`](./core/scripts/)**: the named-script system — `List`/`Save`/`Delete`/`Run` over `~/.botsonv2/scripts/<name>/main.go` + a `script.json` sidecar for the description. Another leaf package (only depends on `core/config` and `core/procutil`), so both `cmd/botson` and `core/tools` (`saveScript`/`runScript`) can use it directly without an import cycle.
 
 ## Architecture / how it works
 
 1. **Registry loading**: default agents (bundled) and custom user agents (from `~/.botsonv2/agents/`) are parsed and built recursively, supporting tool configuration and sub-agent delegation.
-2. **Server hosting**: `botson web` runs the ADK web server — REST (`/api/*`), streaming (`/api/run_sse`), and the console SPA on `/botson/`.
-3. **Discord gateway**: logs into Discord, registers slash commands (`/new`, `/list`, `/select`, `/info`, `/approve`), listens for incoming messages.
+2. **Server hosting**: `botson web` runs the ADK web server — REST (`/api/*`), streaming (`/api/run_sse`), and the console SPA on `/botson/`. This is also the unified core process (see below): the same process holds the agent registry and can run the Discord gateway in-process.
+3. **Discord gateway**: logs into Discord, registers slash commands (`/new`, `/list`, `/select`, `/info`, `/approve`), listens for incoming messages. Runs either inside the core (toggled via `toggleDiscord`/the web console/`botson discord start`) or as a fully standalone process (bare `botson discord`, no subcommand) — see below.
 4. **Web console frontend**: single stylesheet/script architecture split into `main` (layout/view switching), `dashboard` (metrics, agent lists, session activity), `chat` (streaming chat, tool trace visualization, session inspection), `builder` (agent/prompt/tool config forms).
+
+## Unified core architecture
+
+Historically, `botson tui`, `botson web`, and `botson discord` were three fully independent OS processes, each running its own copy of `setupApp()`'s bootstrap (Gemini model, agent registry, session service) with no in-memory sharing. This caused a real bug: a background process launched with no meaningful working directory of its own (e.g. the tray's login-time autostart) silently inherited whatever directory happened to be current at spawn time (`core/daemon.Start` never set the child's cwd). Fixing that properly, plus the desire to let the agent turn Discord on/off for the user without spawning a whole new process, motivated a bigger change (2026-07): **one core process holds the state; the other interfaces become thin clients of it.**
+
+- **The core is `botson web`.** It already did the full bootstrap and already served a complete REST API (`/api/*`, ADK's own — session CRUD, `run_sse` streaming chat), so nothing new needed building there; it's just now the one process that matters. `runWeb` (`cmd/botson/cmd_web.go`) calls `discord.InitCore(boot.Launcher)` so the Discord gateway singleton has what it needs to start later.
+- **`core/daemon`** (`daemon.Start(id, displayName, dir string, childArgs []string)`) now takes an explicit `dir` and threads it through to `child.Dir` — every spawn site (`web start`, tray) passes its own intentional directory instead of relying on ambient inheritance. `daemon.State`/`Status` also gained `Meta map[string]string`, used to stash the running core's actual REST API port (`Meta["apiPort"]`) so a client can find a non-default port. `config.AppConfig.WorkspaceDir` is the one exception to "callers pass their own cwd": the tray has no meaningful cwd of its own (launched via a login autostart entry), so it falls back to this field instead (set once by `setup install`, defaulting to wherever install was run from).
+- **The TUI is a thin client.** `core/interface/apiclient.Client` wraps the core's REST API (`DefaultAgent`, `CreateSession`, `Run` — the last shaped like `iter.Seq2[*Event, error]`, deliberately mirroring `runner.Runner.Run` so `core/interface/tui/io.go`'s event loop needed minimal changes). `runTUI` (`cmd/botson/cmd_tui.go`) checks `daemon.GetStatus("web", ...)` and auto-starts the core (passing its own `os.Getwd()`) if it isn't already running, then talks to it exclusively over HTTP/SSE — it no longer builds its own Gemini client, agent loader, or session service at all, hence `PersistentPreRunE: noBootstrap` on the `tui` command now. A `--no-auto-start` flag exists for anyone who wants the old fully-self-contained behavior.
+- **HITL in the TUI**: this thin-client rewrite also closed a pre-existing gap — the old TUI had no confirmation UI at all, so a `RequireConfirmation: true` tool call silently stalled forever. `core/interface/tui/io.go` now special-cases `FunctionCall.Name == "adk_request_confirmation"` (see "HITL confirmation wire protocol" below) and `tui.go`'s `Update()` gains `y`/`n` keybindings active only while a confirmation is pending.
+- **Discord is an in-process, togglable singleton**, not a separate daemon. `core/interface/discord/singleton.go` holds a package-level `active *Gateway` behind a mutex (`InitCore`/`StartGateway`/`StopGateway`/`GatewayStatus`) — starting/stopping Discord is now just spinning a goroutine + discordgo session up or down within the core, no new OS process. `core/management/discord_daemon.go` keeps its historical exported names (`StartDiscordDaemon`/`StopDiscordDaemon`/`DiscordDaemonStatus`) so `core/interface/web/api_dashboard.go`'s `/discord/start|stop|status` handlers (and the web console's existing Start/Stop buttons) needed zero changes — only the implementation underneath swapped. The `toggleDiscord` agent tool (`core/tools/toggle_discord.go`, `RequireConfirmation: true`) calls `core/interface/discord` **directly**, not through `core/management` — routing through `management` would create an import cycle (`core/tools` → `core/management` → `core/agent` → `core/tools`), so this is the one place Discord control bypasses the `management` layer other callers use. See "Conventions" for the import-direction rule this follows.
+- **`botson discord start/stop/status`** now retarget to whichever core is running, over HTTP (`core/interface/apiclient`'s Discord methods against `/botson/api/discord/*`), erroring clearly if no core is running rather than silently falling back to spawning a standalone process. Bare `botson discord` (no subcommand) is unchanged — still a genuinely standalone, foreground, core-independent process for anyone who wants Discord fully isolated (e.g. on a different machine).
+- **Known limitation, not solved by this**: switching an *already-running* core's workspace directory. It's pinned for that process's lifetime — restart it from a new directory to change it. True per-session/per-tool-call workspace switching would require threading a workspace argument through `agent.Context` and every tool built on `os.Getwd()`, a materially bigger change than this.
 
 ## Bare `botson` dispatch
 
-A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.DefaultCommand` names (`"tui"` / `"web"` / `"discord"`), via `runDefaultCommand` in `cmd/botson/main.go`. Empty or unrecognized values fall back to `"tui"`. This field is **not yet exposed** through `setup install` or any prompt — it's config.json-only for now, set by hand.
+A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.DefaultCommand` names (`"tui"` / `"web"` / `"discord"`), via `runDefaultCommand` in `cmd/botson/main.go`. Empty or unrecognized values fall back to `"tui"`. This field is **not yet exposed** through `setup install` or any prompt — it's config.json-only for now, set by hand. When it resolves to `"tui"`, the TUI still auto-starts the core itself if one isn't already running (see "Unified core architecture" above) — a bare `botson` on a fresh machine works with no separate `web start` step.
 
 ## Self-configuration
 
@@ -59,7 +72,7 @@ Verified live end-to-end (not just unit-tested): drove a real conversation throu
 
 ## HITL confirmation wire protocol
 
-ADK's `RequireConfirmation: true` (used by `saveArtifact`, `updateSettings`, `writeFile`, `runCommand`, `saveScript`, `runScript`) does **not** simply pause and resume the original tool call. Verified 2026-07 by driving a real `writeFile` call through `/api/run_sse` directly and inspecting the raw persisted session -- the actual sequence for one gated call is:
+ADK's `RequireConfirmation: true` (used by `saveArtifact`, `updateSettings`, `writeFile`, `editFile`, `runCommand`, `saveScript`, `runScript`, `toggleDiscord`) does **not** simply pause and resume the original tool call. Verified 2026-07 by driving a real `writeFile` call through `/api/run_sse` directly and inspecting the raw persisted session -- the actual sequence for one gated call is:
 
 1. The model's real `functionCall` (e.g. `writeFile`, some call id `X`).
 2. An **immediate** `functionResponse` for that same call id `X`, before any human has done anything: `{"response": {"error": "error tool \"writeFile\" requires confirmation, please approve or reject"}}`. This is ADK's own internal bookkeeping for "this call is now blocked pending confirmation" -- it is not a real result, even though it has exactly the shape of one.
@@ -115,20 +128,24 @@ Any flag left unset falls back to whatever's already in `config.json` (or a buil
 
 ```bash
 botson                          # same as `tui` — interactive terminal chat (unless DefaultCommand overrides this)
-botson tui --agent "Some Agent"
-botson web --port=8080
-botson discord                  # foreground, tied to this terminal
+botson tui --agent "Some Agent" # thin client; auto-starts the core (`web`) in the background if none is running
+botson web --port=8080          # the unified core: REST/A2A APIs, web console, and (via toggleDiscord) Discord
+botson discord                  # standalone Discord gateway, foreground, tied to this terminal, independent of any core
 botson --help                   # list all commands and flags
 ```
 
-`discord` and `web` also run as detached background processes with a PID-file-backed lifecycle:
+`web` runs as a detached background process with a PID-file-backed lifecycle:
 ```bash
-botson discord start / status / stop [--force]
 botson web start --port=8080 / status / stop [--force]
 ```
-Logs: `~/.botsonv2/logs/{discord,web}.log`. State: `~/.botsonv2/{discord,web}.pid`. Since Windows has no signal-based graceful shutdown for an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this works identically on Linux.
+Logs: `~/.botsonv2/logs/web.log`. State: `~/.botsonv2/web.pid`. Since Windows has no signal-based graceful shutdown for an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this works identically on Linux.
 
-On Windows, `tray` mirrors and controls both via the same state files/logic (`tray`, `tray start/status/stop [--force]`) — closing the tray never stops the background services, since it's just another client of the same daemon state.
+`discord start/stop/status` no longer spawn a separate process — they call the running core's `/botson/api/discord/*` endpoints over HTTP (via `core/interface/apiclient`), erroring if no core is running:
+```bash
+botson discord start / status / stop
+```
+
+On Windows, `tray` mirrors and controls the web core via the same state files/logic (`tray`, `tray start/status/stop [--force]`) — closing the tray never stops the core, since it's just another client of the same daemon state.
 
 ### Setup lifecycle: uninstall / reset / status
 
@@ -203,11 +220,13 @@ go run cmd/botson-adk/main.go       # stock ADK dev console/APIs only
     "owner_id": "your_discord_owner_user_id",
     "whitelist": []
   },
-  "default_command": ""
+  "default_command": "",
+  "workspace_dir": ""
 }
 ```
-- No `discord.enabled` field, deliberately — whether the gateway runs is controlled entirely by the `discord start`/`stop` daemon (or the webui's Start/Stop button, which drives the same daemon).
+- No `discord.enabled` field, deliberately — whether the gateway runs is controlled entirely by `toggleDiscord`/`discord start`/`stop`/the webui's Start/Stop button, which all drive the same in-process singleton (see "Unified core architecture" above).
 - `default_command` (`""` / `"tui"` / `"web"` / `"discord"`) picks what a bare `botson` runs; see "Bare `botson` dispatch" above. Settable via `botson settings set --default-command` or the `updateSettings` agent tool; not yet exposed via `setup install`.
+- `workspace_dir` is only consulted by processes with no meaningful working directory of their own (the tray, launched via login autostart) — everything launched from a terminal (`web start`, `discord start`, the TUI's core auto-start) uses its own actual cwd instead and ignores this field. Set once by `setup install` (defaulting to wherever install itself was run from); omitted (`""`) means "fall back to that process's own cwd."
 - Read/write this file through `botson settings get/set`, the web Settings tab, or the `updateSettings` tool rather than hand-editing while a `botson` process is running, so the in-memory copy that process is holding doesn't drift from disk — see "Self-configuration" above.
 
 ## Dependencies
