@@ -68,5 +68,5 @@ func runTUI(ctx context.Context, agentName string) error {
 		return fmt.Errorf("building runner: %w", err)
 	}
 
-	return tuiinterface.Run(r, boot.Launcher.SessionService, sessionID, targetAgentName)
+	return tuiinterface.Run(r, sessionID, targetAgentName)
 }

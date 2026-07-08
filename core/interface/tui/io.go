@@ -2,13 +2,9 @@ package tui
 
 import (
 	"context"
-	"reflect"
-	"unsafe"
 
 	adkagent "google.golang.org/adk/v2/agent"
 	"google.golang.org/genai"
-	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 )
 
 func (m model) runAgentStream(text string) {
@@ -39,28 +35,4 @@ func (m model) runAgentStream(text string) {
 		}
 	}
 	program.Send(responseDoneMsg{})
-}
-
-// silenceGormLogger reaches into the ADK database session service via unsafe
-// reflection to mute its GORM logger, since it writes to stdout and would
-// otherwise corrupt the Bubble Tea alt-screen rendering.
-func silenceGormLogger(service interface{}) {
-	val := reflect.ValueOf(service)
-	if val.Kind() != reflect.Ptr {
-		return
-	}
-	val = val.Elem()
-	if val.Type().Name() != "databaseService" {
-		return
-	}
-	dbField := val.FieldByName("db")
-	if !dbField.IsValid() {
-		return
-	}
-
-	ptr := unsafe.Pointer(dbField.UnsafeAddr())
-	gormDB := *(**gorm.DB)(ptr)
-	if gormDB != nil {
-		gormDB.Logger = gormlogger.Default.LogMode(gormlogger.Silent)
-	}
 }

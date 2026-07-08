@@ -14,18 +14,14 @@ import (
 )
 
 // Run launches the interactive TUI chat program and blocks until the user
-// exits. sessionService is the concrete session service backing r, passed
-// separately so its GORM logger can be silenced before it can corrupt the
-// alt-screen rendering.
-func Run(r *runner.Runner, sessionService interface{}, sessionID, agentName string) error {
+// exits.
+func Run(r *runner.Runner, sessionID, agentName string) error {
 	// Redirect standard logger to a file to prevent polluting the terminal interface
 	logFile, errLog := os.OpenFile("tui.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if errLog == nil {
 		log.SetOutput(logFile)
 		defer logFile.Close()
 	}
-
-	silenceGormLogger(sessionService)
 
 	m := newModel(r, sessionID, agentName)
 
