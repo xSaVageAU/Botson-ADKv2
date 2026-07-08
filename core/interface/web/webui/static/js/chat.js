@@ -684,7 +684,7 @@ window.updateMessageBubble = function(bubble, newText) {
   if (logEl) logEl.scrollTop = logEl.scrollHeight;
 };
 
-window.appendToolTrace = function(name, output) {
+window.appendToolTrace = function(name, output, status = 'Completed') {
   const logEl = document.getElementById('chatLog');
   if (!logEl) return;
   const welcome = logEl.querySelector('.welcome-message');
@@ -695,6 +695,7 @@ window.appendToolTrace = function(name, output) {
 
   const card = document.createElement('div');
   card.className = 'tool-trace-card';
+  if (status === 'Denied') card.classList.add('tool-trace-denied');
 
   let formattedOutput = '';
   try {
@@ -708,7 +709,7 @@ window.appendToolTrace = function(name, output) {
     <button class="tool-trace-toggle" type="button">
       <span class="tool-trace-icon">⚙</span>
       <span class="tool-trace-name">${window.escapeHtml(name)}</span>
-      <span class="tool-trace-status">Completed</span>
+      <span class="tool-trace-status">${window.escapeHtml(status)}</span>
       <span class="tool-trace-chevron">▸</span>
     </button>
     <pre class="tool-body">${window.escapeHtml(formattedOutput)}</pre>
@@ -737,47 +738,18 @@ window.appendToolCallIndication = function(toolName) {
 };
 
 window.appendHitlResolved = function(fc, confirmed, result) {
-  const logEl = document.getElementById('chatLog');
-  if (!logEl) return;
-
-  const row = document.createElement('div');
-  row.className = 'message-row system';
-
-  const wrap = document.createElement('div');
-  wrap.className = 'hitl-resolved-wrap';
-
+  // Once resolved, a HITL-gated call should look exactly like any other
+  // finished tool call -- same collapsed "COMPLETED"-with-chevron card --
+  // rather than a visually distinct pill, so the two paths converge into
+  // one consistent look instead of two different ones for what's
+  // conceptually the same thing: a tool call that finished.
   const toolName = fc.args.originalFunctionCall?.name || 'tool';
-  const pill = document.createElement('div');
-  pill.className = `hitl-resolved-pill ${confirmed ? 'hitl-resolved-approved' : 'hitl-resolved-denied'}`;
-  pill.innerHTML = `
-    <span class="hitl-resolved-icon">${confirmed ? '✓' : '✗'}</span>
-    <span class="hitl-resolved-name">${window.escapeHtml(toolName)}</span>
-    <span>${confirmed ? 'approved' : 'denied'}</span>
-  `;
-  wrap.appendChild(pill);
-
-  // Only an approved call actually ran and has a real result to show --
-  // shown collapsed, same "click to expand" pattern as a regular tool
-  // trace, so it doesn't clutter the log by default.
-  if (confirmed && result !== undefined) {
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'hitl-resolved-view';
-    toggle.textContent = 'View result';
-    const resultEl = document.createElement('pre');
-    resultEl.className = 'hitl-resolved-result';
-    resultEl.textContent = JSON.stringify(result, null, 2);
-    toggle.onclick = () => {
-      resultEl.classList.toggle('expanded');
-      toggle.textContent = resultEl.classList.contains('expanded') ? 'Hide result' : 'View result';
-    };
-    pill.appendChild(toggle);
-    wrap.appendChild(resultEl);
+  if (confirmed) {
+    const output = result !== undefined ? JSON.stringify(result) : '(no result recorded)';
+    window.appendToolTrace(toolName, output, 'Completed');
+  } else {
+    window.appendToolTrace(toolName, '(denied by user -- not executed)', 'Denied');
   }
-
-  row.appendChild(wrap);
-  logEl.appendChild(row);
-  logEl.scrollTop = logEl.scrollHeight;
 };
 
 window.appendHitlPending = function(fc) {

@@ -291,6 +291,11 @@
   background: var(--green);
 }
 
+/* A denied HITL call still renders as a normal tool-trace-card (see
+   appendHitlResolved) -- only the status dot/color changes. */
+.tool-trace-denied .tool-trace-status { color: var(--danger); }
+.tool-trace-denied .tool-trace-status::before { background: var(--danger); }
+
 .tool-trace-chevron {
   margin-left: auto;
   color: var(--text-faint);
@@ -438,66 +443,6 @@
 .hitl-btn-approve:hover:not(:disabled) { background: #0da271; }
 
 .hitl-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* HITL confirmation -- resolved. Collapses to a slim pill rather than
-   staying full-size once the decision's been made, so a chat with a lot
-   of approvals in it doesn't turn into a wall of bulky cards. */
-.hitl-resolved-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text-dim);
-}
-
-.hitl-resolved-icon {
-  font-size: 11px;
-  line-height: 1;
-}
-
-.hitl-resolved-name { font-family: var(--font-mono); color: var(--text); }
-
-.hitl-resolved-approved .hitl-resolved-icon { color: var(--green); }
-.hitl-resolved-denied .hitl-resolved-icon { color: var(--danger); }
-
-.hitl-resolved-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.hitl-resolved-view {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 11px;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 2px;
-  text-decoration: underline;
-}
-
-.hitl-resolved-result {
-  display: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  max-width: 460px;
-  max-height: 200px;
-  overflow: auto;
-  color: var(--text-dim);
-  white-space: pre-wrap;
-}
-
-.hitl-resolved-result.expanded { display: block; }
 
 /* Typing Indicator */
 .typing-indicator {
