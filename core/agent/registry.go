@@ -36,6 +36,13 @@ var availableTools = map[string]toolBuilder{
 			RequireConfirmation: true,
 		}, tools.SaveArtifact)
 	},
+	"updateSettings": func() (tool.Tool, error) {
+		return functiontool.New(functiontool.Config{
+			Name:                "updateSettings",
+			Description:         "Changes Botson's own non-secret settings (Gemini model, root agent, default command) and persists them immediately. Cannot touch API keys or Discord credentials.",
+			RequireConfirmation: true,
+		}, tools.UpdateSettings)
+	},
 }
 
 // GetAvailableTools returns the sorted list of all registered tool names in the registry.

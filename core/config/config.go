@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // AppConfig holds the application configuration.
@@ -18,6 +19,27 @@ type AppConfig struct {
 	// "tui", "web", or "discord". Not yet exposed via setup/prompts; only
 	// settable by hand-editing config.json for now. Empty means "tui".
 	DefaultCommand string `json:"default_command"`
+}
+
+// MaskedSecret is the placeholder Mask substitutes for secret fields, and
+// what UpdateConfig-style callers should treat as "unchanged, keep the
+// existing value" when they see it come back in a request.
+const MaskedSecret = "******"
+
+// Mask returns a copy of cfg with secret fields (Gemini API key, Discord
+// token) replaced by MaskedSecret, so it's safe to hand to a UI or an
+// agent tool. Lives here rather than in core/management so core/tools can
+// use it too without an import cycle (tools -> management -> agent ->
+// tools).
+func Mask(cfg *AppConfig) AppConfig {
+	masked := *cfg
+	if masked.GeminiAPIKey != "" {
+		masked.GeminiAPIKey = MaskedSecret
+	}
+	if masked.Discord.Token != "" {
+		masked.Discord.Token = MaskedSecret
+	}
+	return masked
 }
 
 // DiscordConfig holds parameters for the Discord gateway integration.
@@ -39,9 +61,34 @@ func GetConfigPath() (string, error) {
 	return filepath.Join(dataDir, "config.json"), nil
 }
 
-// Load loads the configuration from ~/.botsonv2/config.json.
-// If the file does not exist, it returns a default initialized configuration template.
+// mu guards cached, the shared in-process configuration instance. Every
+// Load within a single process returns this same *AppConfig after the
+// first call, and Update mutates its fields in place (rather than
+// replacing the pointer) so every other holder of it -- e.g. cmd/botson's
+// appBoot.Config -- sees the change immediately, without waiting for a
+// restart. Cross-process staleness (another botson process editing the
+// same file) is unaffected: each process still only picks up disk changes
+// made by others at its own next startup.
+var (
+	mu     sync.Mutex
+	cached *AppConfig
+)
+
+// Load returns this process's shared configuration, reading it from
+// ~/.botsonv2/config.json on the first call and returning the same cached
+// instance on every call after that. If the file does not exist yet, it's
+// bootstrapped with a default template.
 func Load() (*AppConfig, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	return loadLocked()
+}
+
+func loadLocked() (*AppConfig, error) {
+	if cached != nil {
+		return cached, nil
+	}
+
 	configPath, err := GetConfigPath()
 	if err != nil {
 		return nil, err
@@ -56,7 +103,9 @@ func Load() (*AppConfig, error) {
 				RootAgent: "Agent Botson",
 			}
 			// Bootstrap the config file so it physically exists
-			_ = Save(defaultCfg)
+			if err := saveLocked(defaultCfg); err != nil {
+				return nil, err
+			}
 			return defaultCfg, nil
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -71,11 +120,21 @@ func Load() (*AppConfig, error) {
 		cfg.ModelName = "gemini-3.1-flash-lite"
 	}
 
-	return &cfg, nil
+	cached = &cfg
+	return cached, nil
 }
 
-// Save writes the configuration to ~/.botsonv2/config.json.
+// Save persists cfg to disk and becomes this process's shared cached
+// instance from then on. Prefer Update when mutating fields already
+// obtained from Load, so the change applies in place instead of
+// orphaning whatever pointer other code is holding.
 func Save(cfg *AppConfig) error {
+	mu.Lock()
+	defer mu.Unlock()
+	return saveLocked(cfg)
+}
+
+func saveLocked(cfg *AppConfig) error {
 	configPath, err := GetConfigPath()
 	if err != nil {
 		return err
@@ -86,12 +145,33 @@ func Save(cfg *AppConfig) error {
 		return fmt.Errorf("failed to serialize config JSON: %w", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0644)
-	if err != nil {
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	cached = cfg
 	return nil
+}
+
+// Update applies mutate to the shared, already-loaded configuration and
+// persists the result in one atomic step. Because mutate edits the
+// existing cached instance's fields in place (rather than Update building
+// a new struct and replacing the pointer), the change is immediately
+// visible to every other holder of that pointer within this process --
+// e.g. a tool letting the running agent change its own settings mid-chat.
+func Update(mutate func(cfg *AppConfig)) (*AppConfig, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	cfg, err := loadLocked()
+	if err != nil {
+		return nil, err
+	}
+	mutate(cfg)
+	if err := saveLocked(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // GetDataDir resolves the physical path to ~/.botsonv2/ and ensures it exists.

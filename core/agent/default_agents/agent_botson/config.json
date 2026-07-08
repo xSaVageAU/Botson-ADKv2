@@ -5,6 +5,7 @@
     "listFiles",
     "readFile",
     "saveArtifact",
-    "loadArtifacts"
+    "loadArtifacts",
+    "updateSettings"
   ]
 }
