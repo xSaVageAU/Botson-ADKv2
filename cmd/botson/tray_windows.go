@@ -144,9 +144,10 @@ func runTray(ctx context.Context) error {
 	return nil
 }
 
-// trayService is a tray-side view of a backgroundable command (discord, web).
-// The tray is just another process talking to the same daemon state/control
-// files the CLI uses -- it doesn't own or supervise these processes' lifecycle.
+// trayService is a tray-side view of a backgroundable command (just `web`
+// now -- see below for why Discord isn't one of these anymore). The tray is
+// just another process talking to the same daemon state/control files the
+// CLI uses -- it doesn't own or supervise these processes' lifecycle.
 type trayService struct {
 	id          string
 	displayName string
@@ -155,17 +156,21 @@ type trayService struct {
 	running     bool
 }
 
-var traySvcDiscord = &trayService{
-	id:          discordDaemonName,
-	displayName: "Discord",
-	childArgs:   []string{"discord", "__daemon-child"},
-}
-
 var traySvcWeb = &trayService{
 	id:          webDaemonName,
 	displayName: "Web",
 	childArgs:   webDaemonChildArgs(8080, false),
 }
+
+// Discord no longer runs as its own backgroundable process (see AGENTS.md's
+// "Unified core architecture") -- it's an in-process toggle of a running
+// core, so the tray controls it over HTTP (discordCoreClient, defined in
+// cmd_discord.go and shared with `botson discord start/stop/status`)
+// instead of daemon.Start/Stop.
+var (
+	mDiscordToggle *systray.MenuItem
+	discordRunning bool
+)
 
 func onTrayReady() {
 	systray.SetIcon(trayIconData)
@@ -173,7 +178,7 @@ func onTrayReady() {
 
 	mOpenChat := systray.AddMenuItem("Open Chat", "Open a new terminal chat session")
 	systray.AddSeparator()
-	traySvcDiscord.toggle = systray.AddMenuItem("Start Discord", "Start/stop the Discord gateway")
+	mDiscordToggle = systray.AddMenuItem("Start Discord", "Start/stop the Discord gateway (requires the web core to be running)")
 	traySvcWeb.toggle = systray.AddMenuItem("Start Web", "Start/stop the web console")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Close this tray icon (background services keep running)")
@@ -187,8 +192,8 @@ func onTrayReady() {
 		}
 	}()
 	go func() {
-		for range traySvcDiscord.toggle.ClickedCh {
-			toggleTrayService(traySvcDiscord)
+		for range mDiscordToggle.ClickedCh {
+			toggleTrayDiscord()
 		}
 	}()
 	go func() {
@@ -202,7 +207,11 @@ func onTrayReady() {
 	}()
 	go func() {
 		<-mStopAllQuit.ClickedCh
-		_ = daemon.Stop(traySvcDiscord.id, traySvcDiscord.displayName, false)
+		if client, err := discordCoreClient(); err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = client.DiscordStop(ctx)
+			cancel()
+		}
 		_ = daemon.Stop(traySvcWeb.id, traySvcWeb.displayName, false)
 		systray.Quit()
 	}()
@@ -238,13 +247,13 @@ func openChatWindow() {
 func onTrayExit() {}
 
 func trayPollLoop() {
-	refreshTrayService(traySvcDiscord)
+	refreshTrayDiscord()
 	refreshTrayService(traySvcWeb)
 
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		refreshTrayService(traySvcDiscord)
+		refreshTrayDiscord()
 		refreshTrayService(traySvcWeb)
 	}
 }
@@ -269,4 +278,44 @@ func toggleTrayService(svc *trayService) {
 		_, _, _ = daemon.Start(svc.id, svc.displayName, trayWorkspaceDir(), svc.childArgs)
 	}
 	refreshTrayService(svc)
+}
+
+// refreshTrayDiscord polls the running core's own Discord status over HTTP
+// instead of a daemon state file, since Discord no longer has one of its
+// own. If no core is running, discordCoreClient itself errors and this
+// just reports "not running" -- there's nothing to toggle until the web
+// core is started.
+func refreshTrayDiscord() {
+	discordRunning = false
+	if client, err := discordCoreClient(); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		running, err := client.DiscordStatus(ctx)
+		cancel()
+		discordRunning = err == nil && running
+	}
+	if mDiscordToggle == nil {
+		return
+	}
+	if discordRunning {
+		mDiscordToggle.SetTitle("Stop Discord")
+	} else {
+		mDiscordToggle.SetTitle("Start Discord")
+	}
+}
+
+func toggleTrayDiscord() {
+	client, err := discordCoreClient()
+	if err != nil {
+		// No core running -- nothing to toggle. The tray has no error UI
+		// to surface this through; the menu item just stays "Start Discord".
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if discordRunning {
+		_ = client.DiscordStop(ctx)
+	} else {
+		_ = client.DiscordStart(ctx)
+	}
+	refreshTrayDiscord()
 }

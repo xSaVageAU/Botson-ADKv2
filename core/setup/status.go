@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"botsonv2/core/config"
 	"botsonv2/core/daemon"
+	"botsonv2/core/interface/apiclient"
 )
 
 // Status reports whether this machine is set up the way `setup install`
@@ -31,7 +33,7 @@ func Status(ctx context.Context) error {
 	printBinaryStatus()
 	printPathStatus()
 	printAutostartStatus()
-	printDaemonStatus()
+	printDaemonStatus(ctx)
 
 	return nil
 }
@@ -106,23 +108,60 @@ func printAutostartStatus() {
 	}
 }
 
-func printDaemonStatus() {
+func printDaemonStatus(ctx context.Context) {
 	fmt.Println("Background services:")
-	for _, d := range []struct{ id, name string }{
-		{"discord", "Discord gateway"},
-		{"web", "Web server"},
-		{"tray", "Tray icon"},
-	} {
-		status, err := daemon.GetStatus(d.id, d.name)
-		if err != nil {
-			fmt.Printf("  %-16s error: %v\n", d.name, err)
-			continue
+
+	webStatus, err := daemon.GetStatus("web", "Web server")
+	printOneDaemonStatus("Web server", webStatus, err)
+
+	printDiscordStatus(ctx, webStatus)
+
+	trayStatus, err := daemon.GetStatus("tray", "Tray icon")
+	printOneDaemonStatus("Tray icon", trayStatus, err)
+}
+
+func printOneDaemonStatus(name string, status daemon.Status, err error) {
+	if err != nil {
+		fmt.Printf("  %-16s error: %v\n", name, err)
+		return
+	}
+	if status.Running {
+		fmt.Printf("  %-16s running (pid %d, started %s)\n", name, status.PID, status.StartedAt.Format(time.RFC3339))
+	} else {
+		fmt.Printf("  %-16s not running\n", name)
+	}
+}
+
+// printDiscordStatus queries the running core's own /botson/api/discord/status
+// instead of a daemon state file -- Discord no longer runs as its own
+// backgroundable process (see AGENTS.md's "Unified core architecture"), so
+// there's no .pid file to check; it only has a status while a core is up.
+func printDiscordStatus(ctx context.Context, webStatus daemon.Status) {
+	const name = "Discord gateway"
+	if !webStatus.Running {
+		fmt.Printf("  %-16s not running (core isn't running)\n", name)
+		return
+	}
+
+	apiPort := 8080
+	if p, ok := webStatus.Meta["apiPort"]; ok {
+		if port, err := strconv.Atoi(p); err == nil {
+			apiPort = port
 		}
-		if status.Running {
-			fmt.Printf("  %-16s running (pid %d, started %s)\n", d.name, status.PID, status.StartedAt.Format(time.RFC3339))
-		} else {
-			fmt.Printf("  %-16s not running\n", d.name)
-		}
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	client := apiclient.New(fmt.Sprintf("http://127.0.0.1:%d", apiPort))
+	running, err := client.DiscordStatus(reqCtx)
+	if err != nil {
+		fmt.Printf("  %-16s error: %v\n", name, err)
+		return
+	}
+	if running {
+		fmt.Printf("  %-16s running (in-process within the core)\n", name)
+	} else {
+		fmt.Printf("  %-16s not running\n", name)
 	}
 }
 
