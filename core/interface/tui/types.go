@@ -3,12 +3,13 @@ package tui
 import (
 	"strings"
 
+	"botsonv2/core/interface/apiclient"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"google.golang.org/adk/v2/runner"
 )
 
 // Package-level program reference to send background messages
@@ -20,11 +21,23 @@ type responseDoneMsg struct{}
 type responseErrMsg struct{ err error }
 type toolCallMsg string
 
+// hitlPendingMsg signals a confirmation-gated tool call is waiting for the
+// user to approve or deny it before the agent can continue.
+type hitlPendingMsg struct {
+	callID   string
+	toolName string
+	hint     string
+}
+
+// hitlResolvedMsg is sent once the user has answered a pending
+// confirmation, so Update can clear it and resume the run.
+type hitlResolvedMsg struct{ approved bool }
+
 type model struct {
 	viewport        viewport.Model
 	textInput       textinput.Model
 	spinner         spinner.Model
-	runner          *runner.Runner
+	client          *apiclient.Client
 	sessionID       string
 	history         []string
 	thinking        bool
@@ -34,8 +47,14 @@ type model struct {
 	agentName       string
 	streamingOutput strings.Builder
 
+	// pendingHITL is non-nil while a confirmation-gated tool call is
+	// awaiting a yes/no answer; text input is disabled meanwhile (see
+	// Update's tea.KeyMsg handling).
+	pendingHITL *hitlPendingMsg
+
 	// Styles
 	userStyle  lipgloss.Style
 	agentStyle lipgloss.Style
 	toolStyle  lipgloss.Style
+	hitlStyle  lipgloss.Style
 }

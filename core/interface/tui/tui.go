@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	"botsonv2/core/interface/apiclient"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"google.golang.org/adk/v2/runner"
 )
 
-func newModel(r *runner.Runner, sessionID, agentName string) model {
+func newModel(client *apiclient.Client, sessionID, agentName string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message... (or type '/exit' to quit)"
 	ti.Focus()
@@ -30,12 +31,13 @@ func newModel(r *runner.Runner, sessionID, agentName string) model {
 		viewport:   vp,
 		textInput:  ti,
 		spinner:    s,
-		runner:     r,
+		client:     client,
 		sessionID:  sessionID,
 		agentName:  agentName,
 		userStyle:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")),
 		agentStyle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")),
 		toolStyle:  lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("208")),
+		hitlStyle:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")),
 	}
 }
 
@@ -79,6 +81,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 
 	case tea.KeyMsg:
+		if m.pendingHITL != nil {
+			// Text input is intentionally not updated at all while a
+			// confirmation is pending (see the `if !m.thinking &&
+			// m.pendingHITL == nil` guard below) -- only y/n/enter/esc/
+			// ctrl+c do anything until it's answered.
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "y", "enter":
+				pending := *m.pendingHITL
+				m.pendingHITL = nil
+				m.thinking = true
+				m.history = append(m.history, m.hitlStyle.Render(fmt.Sprintf("✓ Approved: %s", pending.toolName)))
+				m.viewport.SetContent(m.renderHistory())
+				m.viewport.GotoBottom()
+				go m.resumeAfterConfirmation(pending.callID, true)
+			case "n", "esc":
+				pending := *m.pendingHITL
+				m.pendingHITL = nil
+				m.thinking = true
+				m.history = append(m.history, m.hitlStyle.Render(fmt.Sprintf("✗ Denied: %s", pending.toolName)))
+				m.viewport.SetContent(m.renderHistory())
+				m.viewport.GotoBottom()
+				go m.resumeAfterConfirmation(pending.callID, false)
+			}
+			break
+		}
+
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			return m, tea.Quit
@@ -103,6 +133,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Launch runner goroutine
 			go m.runAgentStream(val)
 		}
+
+	case hitlPendingMsg:
+		m.thinking = false
+		m.pendingHITL = &hitlPendingMsg{callID: msg.callID, toolName: msg.toolName, hint: msg.hint}
+		hint := msg.hint
+		if hint == "" {
+			hint = "The agent requires approval to execute this tool."
+		}
+		m.history = append(m.history, m.hitlStyle.Render(fmt.Sprintf("⚠ Permission requested: %s\n%s\n(y/enter to approve, n/esc to deny)", msg.toolName, hint)))
+		m.viewport.SetContent(m.renderHistory())
+		m.viewport.GotoBottom()
 
 	case spinner.TickMsg:
 		m.spinner, spCmd = m.spinner.Update(msg)
@@ -132,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 	}
 
-	if !m.thinking {
+	if !m.thinking && m.pendingHITL == nil {
 		m.textInput, tiCmd = m.textInput.Update(msg)
 		cmds = append(cmds, tiCmd)
 	}
@@ -167,9 +208,10 @@ func (m model) renderHistory() string {
 	return sb.String()
 }
 
-// footerView renders the bottom status line (either the text input or the
-// "thinking" spinner), constrained to the current terminal width so it can
-// never overflow into an extra line the layout hasn't budgeted for.
+// footerView renders the bottom status line (the text input, the
+// "thinking" spinner, or a pending-confirmation prompt), constrained to
+// the current terminal width so it can never overflow into an extra line
+// the layout hasn't budgeted for.
 func (m model) footerView() string {
 	width := m.width
 	if width <= 0 {
@@ -177,9 +219,12 @@ func (m model) footerView() string {
 	}
 
 	var content string
-	if m.thinking {
+	switch {
+	case m.pendingHITL != nil:
+		content = m.hitlStyle.Render(fmt.Sprintf("Approve %s? [y/n]", m.pendingHITL.toolName))
+	case m.thinking:
 		content = m.spinner.View() + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Agent is thinking...")
-	} else {
+	default:
 		content = m.textInput.View()
 	}
 

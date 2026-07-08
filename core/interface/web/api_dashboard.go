@@ -60,6 +60,24 @@ func registerDashboardRoutes(r *mux.Router, configLauncher *launcher.Config) {
 		controllers.EncodeJSONResponse(map[string]string{"status": "success", "message": "Settings saved successfully"}, http.StatusOK, w)
 	})
 
+	// GET /botson/api/default-agent - returns the configured root agent's
+	// name, so a thin client (TUI, Discord) can learn which agent to talk
+	// to without needing local AgentLoader.RootAgent() access -- the one
+	// piece the ADK's own REST API (GET /api/list-apps, bare names only)
+	// doesn't already cover.
+	r.Methods("GET").Path("/default-agent").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if configLauncher == nil || configLauncher.AgentLoader == nil {
+			http.Error(w, "no agent loader available", http.StatusServiceUnavailable)
+			return
+		}
+		rootAgent := configLauncher.AgentLoader.RootAgent()
+		if rootAgent == nil {
+			http.Error(w, "no root agent loaded in this workspace", http.StatusNotFound)
+			return
+		}
+		controllers.EncodeJSONResponse(map[string]string{"name": rootAgent.Name()}, http.StatusOK, w)
+	})
+
 	// GET /botson/api/discord/status - reports whether the background Discord gateway is running
 	r.Methods("GET").Path("/discord/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		status, err := management.DiscordDaemonStatus()
