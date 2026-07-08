@@ -15,7 +15,7 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
 - **`/core`**: main application packages.
   - **[`/agent`](./core/agent/)**: custom recursive agent loader, default definitions, and tool registry.
   - **[`/artifact`](./core/artifact/)**: local file system service for persistent artifacts.
-  - **[`/config`](./core/config/)**: `AppConfig` struct, load/save, and workspace path lookups (`~/.botsonv2/`).
+  - **[`/config`](./core/config/)**: `AppConfig` struct, load/save/update, and workspace path lookups (`~/.botsonv2/`). `Load` caches a single shared instance per process and `Update` mutates it in place (see "Self-configuration" below) — this is the one package every settings-reading/writing code path (CLI, web API, agent tool) ultimately goes through, so it can't import `core/management`, `core/agent`, or `core/tools` without creating a cycle.
   - **[`/daemon`](./core/daemon/)**: generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) shared by every backgroundable subcommand (`discord`, `web`, `tray`).
   - **[`/setup`](./core/setup/)**: backs `botson setup install/uninstall/reset/status` — prompts (interactive and flag-driven), installing the binary to `~/.botsonv2/bin` and onto PATH, (Windows) tray-autostart registration, and a read-only status report.
   - **[`/interface`](./core/interface/)**: the three user-facing interfaces.
@@ -24,7 +24,7 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
     - **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
   - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, config, dashboard stats, Discord daemon control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions.
   - **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation state. See [docs/sessions.md](./docs/sessions.md) for the full schema/API reference.
-  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `loadArtifacts`, `saveArtifact`).
+  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`).
 
 ## Architecture / how it works
 
@@ -36,6 +36,12 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
 ## Bare `botson` dispatch
 
 A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.DefaultCommand` names (`"tui"` / `"web"` / `"discord"`), via `runDefaultCommand` in `cmd/botson/main.go`. Empty or unrecognized values fall back to `"tui"`. This field is **not yet exposed** through `setup install` or any prompt — it's config.json-only for now, set by hand.
+
+## Self-configuration
+
+`core/config.Load()` returns a single cached `*AppConfig` per process (not a fresh read each call), and `core/config.Update(mutate func(*AppConfig))` edits that cached instance's fields **in place** before persisting to disk, rather than building a new struct and swapping the pointer. That means every long-lived holder of the config pointer within one process (`cmd/botson`'s `appBoot.Config`, anything else that called `Load()` earlier) sees an `Update` immediately, with no restart needed. `core/management.UpdateConfig` and `botson settings set` both go through `config.Update` for this reason — see `core/config/config_test.go` for the regression test guarding this specifically (it would be easy to "simplify" `Update` back into load-then-replace and silently break this).
+
+This is what makes the `updateSettings` agent tool (`core/tools/update_settings.go`) meaningful: the running agent can change its own model/root-agent/default-command mid-conversation and have it actually take effect for the rest of that process's life, not just on next launch. It deliberately excludes secrets (Gemini API key, Discord token/owner) — those stay human-controlled via `botson settings set` or the web console, so a confused or compromised agent can't rotate or wipe its own credentials. `RequireConfirmation: true` is set on its registry entry (`core/agent/registry.go`), same as `saveArtifact`, so it still pauses for a HITL approval before taking effect.
 
 ## Platform-specific files
 
@@ -108,6 +114,14 @@ botson setup status                           # read-only report on install/PATH
 
 `status` makes no changes — reports whether the Gemini key/Discord/root agent are configured, whether the binary is installed and on PATH, tray autostart registration, and whether `discord`/`web`/`tray` are currently running.
 
+### Settings
+
+```bash
+botson settings get [--json]
+botson settings set [--json] --model X --root-agent Y --default-command tui|web|discord --discord-token TOK --discord-owner-id ID --gemini-api-key KEY
+```
+Thin CLI wrapper over `core/management`'s `GetMaskedConfig`/`UpdateConfig` (the same functions the web Settings tab uses). `get` prints a masked summary or, with `--json`, the same masked struct as JSON. `set` only touches the flags you actually pass (checked via `cmd.Flags().Changed(...)`, same pattern as `setup install --non-interactive`) — everything else keeps its current value. Both skip the full agent/model bootstrap (`PersistentPreRunE: noBootstrap`), same reasoning as `setup`: a broken or missing config is exactly the thing `settings set` needs to be usable to fix.
+
 ### Standalone binaries
 
 ```bash
@@ -132,7 +146,8 @@ go run cmd/botson-adk/main.go       # stock ADK dev console/APIs only
 }
 ```
 - No `discord.enabled` field, deliberately — whether the gateway runs is controlled entirely by the `discord start`/`stop` daemon (or the webui's Start/Stop button, which drives the same daemon).
-- `default_command` (`""` / `"tui"` / `"web"` / `"discord"`) picks what a bare `botson` runs; see "Bare `botson` dispatch" above. Not yet settable via `setup install`.
+- `default_command` (`""` / `"tui"` / `"web"` / `"discord"`) picks what a bare `botson` runs; see "Bare `botson` dispatch" above. Settable via `botson settings set --default-command` or the `updateSettings` agent tool; not yet exposed via `setup install`.
+- Read/write this file through `botson settings get/set`, the web Settings tab, or the `updateSettings` tool rather than hand-editing while a `botson` process is running, so the in-memory copy that process is holding doesn't drift from disk — see "Self-configuration" above.
 
 ## Dependencies
 
@@ -153,3 +168,4 @@ Prefer the standard library where it can reasonably do the job; the project lean
 - Commit messages follow Conventional Commits style: `feat:`, `fix:`, `refactor:`, etc., imperative mood, no trailing period.
 - Prefer adding a flag with a sensible default over introducing a new prompt, when a feature needs to be scriptable (see `--non-interactive` on `setup install`, `--force-full-uninstall`).
 - Cobra commands that only manage a background process's lifecycle (not the agent runtime) set `PersistentPreRunE: noBootstrap` to skip the expensive config/Gemini/agent/session bootstrap — see `newDiscordStartCmd`, `newWebStopCmd`, etc.
+- Import direction: `cmd/botson` → `core/management` → `core/agent` → `core/tools` → `core/config`. `core/tools` must never import `core/management` or `core/agent` (it would cycle back through `core/agent`'s import of `core/tools`) — shared logic those layers both need (e.g. `Mask`) belongs in `core/config` instead, not `core/management`.
