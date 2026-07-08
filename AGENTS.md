@@ -8,10 +8,8 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
 
 ## Project structure
 
-- **`/cmd`**: application entry points. `botson` is the primary one and the focus of ongoing design decisions; `botson-discord` and `botson-adk` are minimal standalone alternatives kept alongside it.
+- **`/cmd`**: application entry points. `botson` is the only one — the focus of ongoing design decisions.
   - **[`/botson`](./cmd/botson/)**: the primary application (ships as `botsonv2-<os>-<arch>`) — a Cobra CLI with `tui` (default), `web`, `discord`, `tray` (Windows only), and `setup` subcommands. One binary boots a chat session, the custom web console + REST/A2A APIs, the Discord gateway, a system tray icon, or install/uninstall/reset itself. Also the testing ground for `core/interface/tui` and `core/interface/web`. Does not include the built-in ADK web launcher.
-  - **[`/botson-discord`](./cmd/botson-discord/)**: standalone Discord Gateway bot listener — a minimal, single-interface deployment.
-  - **[`/botson-adk`](./cmd/botson-adk/)**: only the standard, built-in Google ADK developer console/web launcher and APIs — useful for testing against ADK's own dev webserver, kept separate from `botson`.
 - **`/core`**: main application packages.
   - **[`/agent`](./core/agent/)**: custom recursive agent loader, default definitions, and tool registry.
   - **[`/artifact`](./core/artifact/)**: local file system service for persistent artifacts.
@@ -202,13 +200,6 @@ botson sessions show <session-id> --agent NAME --user ID [--json]
 botson sessions delete <session-id> --agent NAME --user ID
 ```
 Thin CLI wrapper over `core/management`'s `ListSessions`/`GetSession`/`DeleteSession`, built directly on `core/session.InitPersistentSessionService` + `management.ListAgents()` rather than the full Gemini/agent-loader bootstrap — so, like `settings`/`agents`/`scripts`, it works even without a configured API key. A session's true identity is the composite key `(AppName, UserID, SessionID)` (see [docs/sessions.md](./docs/sessions.md)), not just the ID alone, which is why `show`/`delete` require `--agent`/`--user` — get those from `list`'s output first. `list`'s `eventCount` is always `0`: the underlying ADK `List` call doesn't preload events (only `Get` does, which `show` uses) — a pre-existing characteristic of the library, not a bug specific to this CLI, and the same limitation `core/management.GetDashboardStats`'s web dashboard stats already have.
-
-### Standalone binaries
-
-```bash
-go run cmd/botson-discord/main.go   # Discord integration only
-go run cmd/botson-adk/main.go       # stock ADK dev console/APIs only
-```
 
 ## Configuration reference
 

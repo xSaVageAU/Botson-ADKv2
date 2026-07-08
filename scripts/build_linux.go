@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 )
 
 func main() {
@@ -20,52 +19,17 @@ func main() {
 		os.Mkdir(outputDir, 0755)
 	}
 
-	targets := []struct {
-		goos   string
-		goarch string
-		suffix string
-	}{
-		{"linux", "amd64", ""},
+	outputPath := filepath.Join(outputDir, "botsonv2-linux-amd64")
+	fmt.Println("Building botsonv2 for linux/amd64...")
+
+	cmd := exec.Command("go", "build", "-o", outputPath, ".")
+	cmd.Dir = filepath.Join(rootDir, "cmd/botson")
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Build failed: %v\n%s\n", err, string(output))
+		os.Exit(1)
 	}
-
-	apps := []struct {
-		name string
-		dir  string
-	}{
-		{"botsonv2", "cmd/botson"},
-		{"botsonv2-discord", "cmd/botson-discord"},
-		{"botsonv2-adk", "cmd/botson-adk"},
-	}
-
-	var wg sync.WaitGroup
-	for _, t := range targets {
-		for _, app := range apps {
-			wg.Add(1)
-			go func(target struct {
-				goos   string
-				goarch string
-				suffix string
-			}, app struct {
-				name string
-				dir  string
-			}) {
-				defer wg.Done()
-				outputPath := filepath.Join(outputDir, fmt.Sprintf("%s-%s-%s%s", app.name, target.goos, target.goarch, target.suffix))
-				fmt.Printf("Building %s for %s/%s...\n", app.name, target.goos, target.goarch)
-
-				cmd := exec.Command("go", "build", "-o", outputPath, ".")
-				cmd.Dir = filepath.Join(rootDir, app.dir)
-				cmd.Env = append(os.Environ(), "GOOS="+target.goos, "GOARCH="+target.goarch)
-
-				output, err := cmd.CombinedOutput()
-				if err != nil {
-					fmt.Printf("Build failed for %s (%s/%s): %v\n%s\n", app.name, target.goos, target.goarch, err, string(output))
-					os.Exit(1)
-				}
-				fmt.Printf("Build successful for %s (%s/%s).\n", app.name, target.goos, target.goarch)
-			}(t, app)
-		}
-	}
-	wg.Wait()
-	fmt.Println("Linux builds successful.")
+	fmt.Println("Linux build successful.")
 }

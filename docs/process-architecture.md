@@ -70,7 +70,6 @@ The one deliberate exception: **the TUI, when no core is already running, become
 | `botson discord` (no subcommand) | A fully standalone Discord gateway process, independent of any core. For isolating Discord onto its own machine/process if you want that. | Yes, but doesn't share it with anything. | No — writes no daemon state at all. |
 | `botson discord start` / `stop` / `status` | Thin client. Calls a running core's `/botson/api/discord/*` to toggle/query its in-process Discord gateway. | No. | N/A |
 | `botson tray` (Windows only) | GUI thin client + a client-side supervisor for the core's own `web start`/`stop`. | No. | Yes, via `~/.botsonv2/tray.pid`, same mechanism as `web`. |
-| `botson-discord`, `botson-adk` | Separate minimal binaries (`cmd/botson-discord`, `cmd/botson-adk`), each self-contained, for narrower deployments. Outside the unified-core picture entirely. | Yes, independently. | No. |
 
 ---
 
