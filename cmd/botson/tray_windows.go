@@ -11,11 +11,25 @@ import (
 	"syscall"
 	"time"
 
+	"botsonv2/core/config"
 	"botsonv2/core/daemon"
 
 	"github.com/getlantern/systray"
 	"github.com/spf13/cobra"
 )
+
+// trayWorkspaceDir resolves the working directory for a process tray
+// itself spawns. Tray typically has no meaningful cwd of its own (e.g.
+// launched via a login-time autostart entry with no real working
+// directory), so it prefers the explicitly configured workspace over its
+// own ambient cwd, falling back to that cwd only if nothing's configured.
+func trayWorkspaceDir() string {
+	if cfg, err := config.Load(); err == nil && cfg.WorkspaceDir != "" {
+		return cfg.WorkspaceDir
+	}
+	wd, _ := os.Getwd()
+	return wd
+}
 
 //go:embed assets/tray.ico
 var trayIconData []byte
@@ -53,7 +67,7 @@ func newTrayStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start the tray icon as a detached background process (no console window)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			pid, logPath, err := daemon.Start(trayDaemonName, trayDisplayName, []string{"tray", "__daemon-child"})
+			pid, logPath, err := daemon.Start(trayDaemonName, trayDisplayName, trayWorkspaceDir(), []string{"tray", "__daemon-child"})
 			if err != nil {
 				return err
 			}
@@ -252,7 +266,7 @@ func toggleTrayService(svc *trayService) {
 	if svc.running {
 		_ = daemon.Stop(svc.id, svc.displayName, false)
 	} else {
-		_, _, _ = daemon.Start(svc.id, svc.displayName, svc.childArgs)
+		_, _, _ = daemon.Start(svc.id, svc.displayName, trayWorkspaceDir(), svc.childArgs)
 	}
 	refreshTrayService(svc)
 }

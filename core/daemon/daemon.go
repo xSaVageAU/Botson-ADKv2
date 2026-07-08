@@ -28,15 +28,22 @@ type State struct {
 	PID       int       `json:"pid"`
 	Port      int       `json:"port"`
 	StartedAt time.Time `json:"started_at"`
+	// Meta carries caller-defined key/value pairs alongside the state this
+	// package already tracks -- kept deliberately CLI/HTTP-agnostic (a free-
+	// form string map, not a named field like "APIPort") so this package
+	// doesn't need to know what an API port is. The web daemon stashes its
+	// real REST API port here so another process can discover it.
+	Meta map[string]string `json:"meta,omitempty"`
 }
 
 // Status is a caller-friendly snapshot of a daemon's current state.
 type Status struct {
-	ID          string    `json:"id"`
-	DisplayName string    `json:"displayName"`
-	Running     bool      `json:"running"`
-	PID         int       `json:"pid,omitempty"`
-	StartedAt   time.Time `json:"startedAt,omitempty"`
+	ID          string            `json:"id"`
+	DisplayName string            `json:"displayName"`
+	Running     bool              `json:"running"`
+	PID         int               `json:"pid,omitempty"`
+	StartedAt   time.Time         `json:"startedAt,omitempty"`
+	Meta        map[string]string `json:"meta,omitempty"`
 }
 
 func statePath(id string) (string, error) {
@@ -154,8 +161,13 @@ func StartControlListener(cancel func()) (net.Listener, int, error) {
 // Start spawns a detached background process running this same executable
 // with childArgs, and waits (up to 5s) for it to report itself ready via
 // its state file. id is the internal name used for state/log file paths;
-// displayName is only used in returned error text.
-func Start(id, displayName string, childArgs []string) (pid int, logPath string, err error) {
+// displayName is only used in returned error text. dir sets the child's
+// working directory explicitly -- callers should always pass their own
+// os.Getwd() (or an intentionally configured workspace) rather than
+// leaving this to whatever the child would otherwise inherit, which is
+// silent and often surprising for a detached process (e.g. one launched
+// by a login-time autostart entry with no meaningful cwd of its own).
+func Start(id, displayName, dir string, childArgs []string) (pid int, logPath string, err error) {
 	if state, err := readState(id); err == nil && isAlive(state) {
 		return state.PID, "", fmt.Errorf("%s is already running (pid %d)", displayName, state.PID)
 	}
@@ -176,6 +188,7 @@ func Start(id, displayName string, childArgs []string) (pid int, logPath string,
 	defer logFile.Close()
 
 	child := exec.Command(exePath, childArgs...)
+	child.Dir = dir
 	child.Stdout = logFile
 	child.Stderr = logFile
 	child.SysProcAttr = detachedSysProcAttr()
@@ -266,5 +279,6 @@ func GetStatus(id, displayName string) (Status, error) {
 		Running:     true,
 		PID:         state.PID,
 		StartedAt:   state.StartedAt,
+		Meta:        state.Meta,
 	}, nil
 }

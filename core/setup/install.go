@@ -52,6 +52,21 @@ func Install(ctx context.Context, opts InstallOptions) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// Record the directory install was run from as the workspace fallback
+	// for processes with no meaningful cwd of their own (tray, launched via
+	// a login-time autostart entry) -- set once, persisted immediately via
+	// config.Update (which mutates cfg in place, since it's the same cached
+	// instance Load() just returned) regardless of which branch below runs,
+	// since reconfigure=false skips every other config.Save call in this
+	// function.
+	if cfg.WorkspaceDir == "" {
+		if wd, wdErr := os.Getwd(); wdErr == nil {
+			if _, err := config.Update(func(c *config.AppConfig) { c.WorkspaceDir = wd }); err != nil {
+				return fmt.Errorf("failed to save workspace directory: %w", err)
+			}
+		}
+	}
+
 	if opts.NonInteractive {
 		if err := applyInstallOptions(cfg, opts); err != nil {
 			return err
@@ -125,7 +140,7 @@ func Install(ctx context.Context, opts InstallOptions) error {
 			}
 		}
 		if startNow {
-			if _, _, err := daemon.Start("tray", "Tray icon", []string{"tray", "__daemon-child"}); err != nil {
+			if _, _, err := daemon.Start("tray", "Tray icon", cfg.WorkspaceDir, []string{"tray", "__daemon-child"}); err != nil {
 				fmt.Printf("Warning: failed to start the tray icon: %v\n", err)
 			} else {
 				fmt.Println("Tray icon started.")

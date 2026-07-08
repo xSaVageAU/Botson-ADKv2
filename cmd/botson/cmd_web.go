@@ -27,7 +27,7 @@ func newWebCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "web",
-		Short: "Start the unified web console with REST & A2A APIs",
+		Short: "Start Botson's unified core: REST/A2A APIs, the web console, and (with `toggleDiscord`) the Discord gateway",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runWeb(cmd.Context(), port, otelToCloud)
 		},
@@ -72,6 +72,7 @@ func newWebDaemonChildCmd() *cobra.Command {
 				PID:       os.Getpid(),
 				Port:      ctrlPort,
 				StartedAt: time.Now(),
+				Meta:      map[string]string{"apiPort": strconv.Itoa(port)},
 			}); err != nil {
 				return fmt.Errorf("failed to write daemon state: %w", err)
 			}
@@ -94,7 +95,11 @@ func newWebStartCmd() *cobra.Command {
 		Short:             "Start the web console as a detached background process",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			pid, logPath, err := daemon.Start(webDaemonName, webDisplayName, webDaemonChildArgs(port, otelToCloud))
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to resolve current directory: %w", err)
+			}
+			pid, logPath, err := daemon.Start(webDaemonName, webDisplayName, wd, webDaemonChildArgs(port, otelToCloud))
 			if err != nil {
 				return err
 			}
