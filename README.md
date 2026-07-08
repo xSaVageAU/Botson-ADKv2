@@ -46,3 +46,4 @@ Settings live in `~/.botsonv2/config.json` — your Gemini API key, chosen model
 
 - **[AGENTS.md](./AGENTS.md)** — architecture, project layout, and the full CLI reference. Start here if you're contributing or maintaining the code (human or AI).
 - **[docs/sessions.md](./docs/sessions.md)** — how sessions, state, and history are stored.
+- **[docs/process-architecture.md](./docs/process-architecture.md)** — how Botson runs as one or more processes: the unified core, how clients discover it, and how the TUI/Discord/tray each fit in.
