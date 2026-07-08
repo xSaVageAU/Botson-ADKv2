@@ -161,17 +161,24 @@ window.selectSession = async function(sessionId) {
 
       // 1. Scan chronologically to build lookup tables keyed by function
       // call id: which adk_request_confirmation calls have been answered,
-      // and what every regular tool call's result actually was. Without
-      // the second table, a saved (i.e. already-finished) tool call has
-      // no way to be told apart from one still in flight -- which is why
-      // this used to always render the "running" indicator forever, even
-      // for a call that completed the moment it happened.
+      // what every tool call's real result was, and which call ids went
+      // through HITL confirmation at all.
+      //
+      // The last one matters because a confirmation-gated tool call
+      // produces its own functionResponse *immediately*, before the user
+      // ever approves anything -- e.g. {"error": "... requires
+      // confirmation, please approve or reject"} -- which is placeholder
+      // bookkeeping, not a real result. Treating it as one (as an earlier
+      // version of this code did) rendered the tool call as "Completed"
+      // at the exact same time its adk_request_confirmation sibling
+      // showed the still-pending approval card right below it.
       const answeredConfirmations = {};
       const functionResults = {};
+      const confirmationOriginalIds = new Set();
       sessionData.events.forEach(ev => {
-        if (ev.content && ev.content.parts) {
-          ev.content.parts.forEach(part => {
-            if (!part.functionResponse) return;
+        if (!ev.content || !ev.content.parts) return;
+        ev.content.parts.forEach(part => {
+          if (part.functionResponse) {
             if (part.functionResponse.name === 'adk_request_confirmation') {
               const resp = part.functionResponse.response || {};
               answeredConfirmations[part.functionResponse.id] = {
@@ -181,8 +188,12 @@ window.selectSession = async function(sessionId) {
             } else {
               functionResults[part.functionResponse.id] = part.functionResponse.response;
             }
-          });
-        }
+          }
+          if (part.functionCall && part.functionCall.name === 'adk_request_confirmation') {
+            const originalId = part.functionCall.args?.originalFunctionCall?.id;
+            if (originalId) confirmationOriginalIds.add(originalId);
+          }
+        });
       });
 
       // 2. Render all events
@@ -203,11 +214,19 @@ window.selectSession = async function(sessionId) {
             if (part.functionCall) {
               if (part.functionCall.name === 'adk_request_confirmation') {
                 const callId = part.functionCall.id;
+                const originalId = part.functionCall.args?.originalFunctionCall?.id;
                 if (answeredConfirmations[callId]) {
-                  window.appendHitlResolved(part.functionCall, answeredConfirmations[callId].confirmed);
+                  window.appendHitlResolved(part.functionCall, answeredConfirmations[callId].confirmed, functionResults[originalId]);
                 } else {
                   window.appendHitlPending(part.functionCall);
                 }
+              } else if (confirmationOriginalIds.has(part.functionCall.id)) {
+                // This call went (or is going) through HITL confirmation --
+                // its story is fully told by the adk_request_confirmation
+                // card above/below, including its real result once
+                // approved. Rendering it again here too would be
+                // redundant, and the placeholder "requires confirmation"
+                // response it gets immediately isn't a real result to show.
               } else if (Object.prototype.hasOwnProperty.call(functionResults, part.functionCall.id)) {
                 // A saved conversation only ever contains finished calls --
                 // render the actual result, collapsed by default, same as
@@ -717,12 +736,15 @@ window.appendToolCallIndication = function(toolName) {
   logEl.scrollTop = logEl.scrollHeight;
 };
 
-window.appendHitlResolved = function(fc, confirmed) {
+window.appendHitlResolved = function(fc, confirmed, result) {
   const logEl = document.getElementById('chatLog');
   if (!logEl) return;
 
   const row = document.createElement('div');
   row.className = 'message-row system';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hitl-resolved-wrap';
 
   const toolName = fc.args.originalFunctionCall?.name || 'tool';
   const pill = document.createElement('div');
@@ -732,8 +754,28 @@ window.appendHitlResolved = function(fc, confirmed) {
     <span class="hitl-resolved-name">${window.escapeHtml(toolName)}</span>
     <span>${confirmed ? 'approved' : 'denied'}</span>
   `;
+  wrap.appendChild(pill);
 
-  row.appendChild(pill);
+  // Only an approved call actually ran and has a real result to show --
+  // shown collapsed, same "click to expand" pattern as a regular tool
+  // trace, so it doesn't clutter the log by default.
+  if (confirmed && result !== undefined) {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'hitl-resolved-view';
+    toggle.textContent = 'View result';
+    const resultEl = document.createElement('pre');
+    resultEl.className = 'hitl-resolved-result';
+    resultEl.textContent = JSON.stringify(result, null, 2);
+    toggle.onclick = () => {
+      resultEl.classList.toggle('expanded');
+      toggle.textContent = resultEl.classList.contains('expanded') ? 'Hide result' : 'View result';
+    };
+    pill.appendChild(toggle);
+    wrap.appendChild(resultEl);
+  }
+
+  row.appendChild(wrap);
   logEl.appendChild(row);
   logEl.scrollTop = logEl.scrollHeight;
 };

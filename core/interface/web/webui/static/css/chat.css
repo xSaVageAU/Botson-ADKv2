@@ -464,6 +464,41 @@
 .hitl-resolved-approved .hitl-resolved-icon { color: var(--green); }
 .hitl-resolved-denied .hitl-resolved-icon { color: var(--danger); }
 
+.hitl-resolved-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.hitl-resolved-view {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  text-decoration: underline;
+}
+
+.hitl-resolved-result {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  max-width: 460px;
+  max-height: 200px;
+  overflow: auto;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+.hitl-resolved-result.expanded { display: block; }
+
 /* Typing Indicator */
 .typing-indicator {
   display: none;
