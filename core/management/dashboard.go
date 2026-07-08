@@ -23,9 +23,33 @@ type AgentStat struct {
 type SessionStat struct {
 	ID             string `json:"id"`
 	AgentName      string `json:"agentName"`
+	UserID         string `json:"userId"`
 	DisplayName    string `json:"displayName"`
 	LastUpdateTime int64  `json:"lastUpdateTime"`
 	EventCount     int    `json:"eventCount"`
+}
+
+// toSessionStat extracts the summary fields dashboard/CLI display both
+// need, including __session_metadata__.displayName if the session has one
+// -- shared so this extraction logic lives in exactly one place.
+func toSessionStat(s session.Session) SessionStat {
+	displayName := ""
+	if val, err := s.State().Get("__session_metadata__"); err == nil {
+		if metadataMap, ok := val.(map[string]any); ok {
+			if dn, ok := metadataMap["displayName"].(string); ok {
+				displayName = dn
+			}
+		}
+	}
+
+	return SessionStat{
+		ID:             s.ID(),
+		AgentName:      s.AppName(),
+		UserID:         s.UserID(),
+		DisplayName:    displayName,
+		LastUpdateTime: s.LastUpdateTime().Unix(),
+		EventCount:     s.Events().Len(),
+	}
 }
 
 // DashboardStats is the overall aggregated system snapshot.
@@ -92,25 +116,8 @@ func GetDashboardStats(ctx context.Context, configLauncher *launcher.Config) (*D
 	var sessionStats []SessionStat
 
 	for _, s := range allSessions {
-		eventCount := s.Events().Len()
-		totalEvents += eventCount
-
-		displayName := ""
-		if val, err := s.State().Get("__session_metadata__"); err == nil {
-			if metadataMap, ok := val.(map[string]any); ok {
-				if dn, ok := metadataMap["displayName"].(string); ok {
-					displayName = dn
-				}
-			}
-		}
-
-		sessionStats = append(sessionStats, SessionStat{
-			ID:             s.ID(),
-			AgentName:      s.AppName(),
-			DisplayName:    displayName,
-			LastUpdateTime: s.LastUpdateTime().Unix(),
-			EventCount:     eventCount,
-		})
+		totalEvents += s.Events().Len()
+		sessionStats = append(sessionStats, toSessionStat(s))
 	}
 
 	sort.Slice(sessionStats, func(i, j int) bool {
