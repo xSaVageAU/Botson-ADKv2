@@ -16,8 +16,9 @@ type AppConfig struct {
 	Discord      DiscordConfig `json:"discord"`
 
 	// DefaultCommand is which subcommand a bare `botson` (no args) runs --
-	// "tui", "web", or "discord". Not yet exposed via setup/prompts; only
-	// settable by hand-editing config.json for now. Empty means "tui".
+	// "tui", "web", or "discord". Settable via `botson setup install`,
+	// `botson settings set --default-command`, or the updateSettings agent
+	// tool. Empty means "tui".
 	DefaultCommand string `json:"default_command"`
 
 	// WorkspaceDir is the directory background/detached processes (tray,

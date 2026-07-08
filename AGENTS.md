@@ -51,7 +51,7 @@ Historically, `botson tui`, `botson web`, and `botson discord` were three fully 
 
 ## Bare `botson` dispatch
 
-A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.DefaultCommand` names (`"tui"` / `"web"` / `"discord"`), via `runDefaultCommand` in `cmd/botson/main.go`. Empty or unrecognized values fall back to `"tui"`. This field is **not yet exposed** through `setup install` or any prompt — it's config.json-only for now, set by hand. When it resolves to `"tui"`, a bare `botson` on a fresh machine still works with no separate `web start` step first — it just runs its own private, in-process core rather than a shared one (see "Unified core architecture" above), so nothing is left running once you exit.
+A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.DefaultCommand` names (`"tui"` / `"web"` / `"discord"`), via `runDefaultCommand` in `cmd/botson/main.go`. Empty or unrecognized values fall back to `"tui"`. Settable via `botson setup install` (interactive prompt or `--default-command` flag), `botson settings set --default-command`, or the `updateSettings` agent tool. When it resolves to `"tui"`, a bare `botson` on a fresh machine still works with no separate `web start` step first — it just runs its own private, in-process core rather than a shared one (see "Unified core architecture" above), so nothing is left running once you exit.
 
 ## Self-configuration
 
@@ -118,6 +118,7 @@ botson setup install --non-interactive --gemini-api-key "KEY" [flags...]
 | `--gemini-api-key` | required on a first-ever install; keeps the existing key if omitted on a re-run |
 | `--model` | default `gemini-3.1-flash-lite` |
 | `--root-agent` | default `Agent Botson` |
+| `--default-command` | `tui`, `web`, or `discord`; default `tui` |
 | `--discord` | tri-state: `true` enables, `false` disables/clears, **omit** to leave existing Discord config untouched |
 | `--discord-token` | required if `--discord=true` and no token is already saved |
 | `--discord-owner-id` | optional |
@@ -219,7 +220,7 @@ Thin CLI wrapper over `internal/management`'s `ListSessions`/`GetSession`/`Delet
 }
 ```
 - No `discord.enabled` field, deliberately — whether the gateway runs is controlled entirely by `toggleDiscord`/`discord start`/`stop`/the webui's Start/Stop button, which all drive the same in-process singleton (see "Unified core architecture" above).
-- `default_command` (`""` / `"tui"` / `"web"` / `"discord"`) picks what a bare `botson` runs; see "Bare `botson` dispatch" above. Settable via `botson settings set --default-command` or the `updateSettings` agent tool; not yet exposed via `setup install`.
+- `default_command` (`""` / `"tui"` / `"web"` / `"discord"`) picks what a bare `botson` runs; see "Bare `botson` dispatch" above. Settable via `botson setup install`, `botson settings set --default-command`, or the `updateSettings` agent tool.
 - `workspace_dir` is only consulted by processes with no meaningful working directory of their own (the tray, launched via login autostart) — everything launched from a terminal (`web start`, `discord start`) uses its own actual cwd instead and ignores this field. The TUI's embedded core (see "Unified core architecture") doesn't consult it either -- being in-process, it simply runs in whatever directory the TUI itself was started from, with nothing to configure. Set once by `setup install` (defaulting to wherever install itself was run from); omitted (`""`) means "fall back to that process's own cwd."
 - Read/write this file through `botson settings get/set`, the web Settings tab, or the `updateSettings` tool rather than hand-editing while a `botson` process is running, so the in-memory copy that process is holding doesn't drift from disk — see "Self-configuration" above.
 

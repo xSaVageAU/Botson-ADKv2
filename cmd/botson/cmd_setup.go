@@ -26,6 +26,7 @@ func newSetupInstallCmd() *cobra.Command {
 		geminiAPIKey   string
 		modelName      string
 		rootAgent      string
+		defaultCommand string
 		discord        bool
 		discordToken   string
 		discordOwnerID string
@@ -47,6 +48,7 @@ func newSetupInstallCmd() *cobra.Command {
 				GeminiAPIKey:   geminiAPIKey,
 				ModelName:      modelName,
 				RootAgent:      rootAgent,
+				DefaultCommand: defaultCommand,
 				DiscordToken:   discordToken,
 				DiscordOwnerID: discordOwnerID,
 			}
@@ -67,6 +69,7 @@ func newSetupInstallCmd() *cobra.Command {
 	cmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Gemini API key (required on a first install if --non-interactive)")
 	cmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (default: gemini-3.1-flash-lite)")
 	cmd.Flags().StringVar(&rootAgent, "root-agent", "", "Root agent name (default: Agent Botson)")
+	cmd.Flags().StringVar(&defaultCommand, "default-command", "", "What a bare `botson` runs: tui, web, or discord (default: tui)")
 	cmd.Flags().BoolVar(&discord, "discord", false, "Enable (true) or disable (false) Discord integration; omit to leave existing Discord config untouched")
 	cmd.Flags().StringVar(&discordToken, "discord-token", "", "Discord bot token (required if --discord=true and none is already configured)")
 	cmd.Flags().StringVar(&discordOwnerID, "discord-owner-id", "", "Discord owner user ID")

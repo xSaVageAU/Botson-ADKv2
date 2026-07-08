@@ -26,9 +26,10 @@ import (
 type InstallOptions struct {
 	NonInteractive bool
 
-	GeminiAPIKey string
-	ModelName    string
-	RootAgent    string
+	GeminiAPIKey   string
+	ModelName      string
+	RootAgent      string
+	DefaultCommand string
 
 	Discord        *bool
 	DiscordToken   string
@@ -174,6 +175,15 @@ func applyInstallOptions(cfg *config.AppConfig, opts InstallOptions) error {
 		cfg.RootAgent = "Agent Botson"
 	}
 
+	if opts.DefaultCommand != "" {
+		switch opts.DefaultCommand {
+		case "tui", "web", "discord":
+			cfg.DefaultCommand = opts.DefaultCommand
+		default:
+			return fmt.Errorf("--default-command must be one of: tui, web, discord (got %q)", opts.DefaultCommand)
+		}
+	}
+
 	if opts.Discord != nil {
 		if *opts.Discord {
 			if opts.DiscordToken != "" {
@@ -315,6 +325,33 @@ func promptDiscordSettings(cfg *config.AppConfig) error {
 	return nil
 }
 
+// promptDefaultCommand asks which subcommand a bare `botson` (no
+// subcommand) should run -- see config.AppConfig.DefaultCommand.
+func promptDefaultCommand(cfg *config.AppConfig) error {
+	def := cfg.DefaultCommand
+	if def == "" {
+		def = "tui"
+	}
+
+	fmt.Println("What should a bare `botson` (no subcommand) run?")
+	fmt.Println("  tui     - interactive terminal chat (default)")
+	fmt.Println("  web     - the web console, REST/A2A APIs, and Discord")
+	fmt.Println("  discord - the Discord bot only, foreground")
+
+	choice, err := ReadLine("Default command", def)
+	if err != nil {
+		return err
+	}
+
+	switch choice {
+	case "tui", "web", "discord":
+		cfg.DefaultCommand = choice
+	default:
+		return fmt.Errorf("default command must be one of: tui, web, discord (got %q)", choice)
+	}
+	return nil
+}
+
 // runConfigWizard runs the full set of prompts in order; Reset reuses the
 // individual prompt* functions directly for whichever categories aren't
 // kept, rather than calling this.
@@ -326,6 +363,9 @@ func runConfigWizard(cfg *config.AppConfig) error {
 		return err
 	}
 	if err := promptDiscordSettings(cfg); err != nil {
+		return err
+	}
+	if err := promptDefaultCommand(cfg); err != nil {
 		return err
 	}
 	return nil
