@@ -13,6 +13,11 @@ type AppConfig struct {
 	GeminiAPIKey string        `json:"gemini_api_key"`
 	RootAgent    string        `json:"root_agent"`
 	Discord      DiscordConfig `json:"discord"`
+
+	// DefaultCommand is which subcommand a bare `botson` (no args) runs --
+	// "tui", "web", or "discord". Not yet exposed via setup/prompts; only
+	// settable by hand-editing config.json for now. Empty means "tui".
+	DefaultCommand string `json:"default_command"`
 }
 
 // DiscordConfig holds parameters for the Discord gateway integration.

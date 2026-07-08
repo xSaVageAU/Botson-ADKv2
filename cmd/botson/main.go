@@ -14,8 +14,9 @@ import (
 // by rootCmd's PersistentPreRunE before any subcommand's RunE executes.
 var boot *appBoot
 
-// agentFlag is shared between the root command (bare `botson`, which behaves
-// like `botson tui`) and the explicit `tui` subcommand.
+// agentFlag is shared between the root command (bare `botson`, which runs
+// whichever subcommand config.AppConfig.DefaultCommand names) and the
+// explicit `tui` subcommand.
 var agentFlag string
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTUI(cmd.Context(), agentFlag)
+			return runDefaultCommand(cmd.Context())
 		},
 	}
 	rootCmd.PersistentFlags().StringVar(&agentFlag, "agent", "", "Agent name to chat with (defaults to the configured root agent)")
@@ -48,5 +49,20 @@ func main() {
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
+	}
+}
+
+// runDefaultCommand runs whichever interface config.AppConfig.DefaultCommand
+// names when `botson` is invoked with no subcommand. Empty/unrecognized
+// values fall back to the TUI, so existing installs (and configs predating
+// this field) behave exactly as before.
+func runDefaultCommand(ctx context.Context) error {
+	switch boot.Config.DefaultCommand {
+	case "web":
+		return runWeb(ctx, 8080, false)
+	case "discord":
+		return runDiscord(ctx)
+	default:
+		return runTUI(ctx, agentFlag)
 	}
 }
