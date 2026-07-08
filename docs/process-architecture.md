@@ -17,12 +17,12 @@ The redesign (2026-07) moved to a **unified core**: one process holds the Gemini
 **The core is just `botson web`.** It already ran ADK's full REST API (`/api/*` — session CRUD, `run_sse` streaming chat) and the web console, so nothing new had to be invented; it was simply promoted to "the one process that matters." Concretely, the core process holds:
 
 - the Gemini model client (`google.golang.org/genai` + `adk/v2/model/gemini`)
-- the agent registry / loader (`core/agent`)
-- the session service (SQLite-backed, `core/session`)
-- the artifact service (`core/artifact`)
+- the agent registry / loader (`internal/agent`)
+- the session service (SQLite-backed, `internal/session`)
+- the artifact service (`internal/artifact`)
 - optionally, the Discord gateway (see §5.2) — a togglable feature of the core, not a separate program
 
-Every other interface — the TUI, the CLI's `discord start/stop/status`, the Windows tray — is a **thin client**: it holds none of the above itself. It just makes HTTP calls to a core process over loopback (`core/interface/apiclient`), the same way a browser talks to the web console.
+Every other interface — the TUI, the CLI's `discord start/stop/status`, the Windows tray — is a **thin client**: it holds none of the above itself. It just makes HTTP calls to a core process over loopback (`internal/interface/apiclient`), the same way a browser talks to the web console.
 
 ```
                      ┌─────────────────────────────────────┐
@@ -75,7 +75,7 @@ The one deliberate exception: **the TUI, when no core is already running, become
 
 ## 4. How a client finds (or announces) a core
 
-Discovery is entirely file-based, through `core/daemon` — deliberately simple: no network broadcast, no service registry, just a JSON file per named process under `~/.botsonv2/`.
+Discovery is entirely file-based, through `internal/daemon` — deliberately simple: no network broadcast, no service registry, just a JSON file per named process under `~/.botsonv2/`.
 
 **State file** (`~/.botsonv2/<id>.pid`, currently only `web` and `tray` use one):
 ```json
@@ -115,7 +115,7 @@ Internally (`cmd/botson/cmd_web.go`), `runWeb` does the registration (state file
 
 ### 5.2 Discord: in-process toggle, or fully standalone
 
-Discord is **not** a background daemon in its own right anymore. `core/interface/discord/singleton.go` holds a package-level `*Gateway` behind a mutex — starting/stopping it is just spinning a goroutine and a discordgo session up or down *inside whatever process called `discord.InitCore`* (i.e., the core). This is what lets the agent itself flip Discord on/off mid-conversation via the `toggleDiscord` tool, with no process spawning involved at all.
+Discord is **not** a background daemon in its own right anymore. `internal/interface/discord/singleton.go` holds a package-level `*Gateway` behind a mutex — starting/stopping it is just spinning a goroutine and a discordgo session up or down *inside whatever process called `discord.InitCore`* (i.e., the core). This is what lets the agent itself flip Discord on/off mid-conversation via the `toggleDiscord` tool, with no process spawning involved at all.
 
 ```
 botson discord start / status / stop     # calls the running core's /botson/api/discord/* over HTTP; errors clearly if no core is running

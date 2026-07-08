@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"botsonv2/core/config"
-	"botsonv2/core/management"
-	coresession "botsonv2/core/session"
+	"botsonv2/internal/config"
+	"botsonv2/internal/management"
+	coresession "botsonv2/internal/session"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/adk/v2/session"

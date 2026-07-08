@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"botsonv2/core/config"
-	"botsonv2/core/daemon"
+	"botsonv2/internal/config"
+	"botsonv2/internal/daemon"
 
 	"github.com/getlantern/systray"
 	"github.com/spf13/cobra"
@@ -218,7 +218,7 @@ func onTrayReady() {
 }
 
 // CREATE_NO_WINDOW isn't exposed as a named constant in the syscall
-// package (same situation as DETACHED_PROCESS in core/daemon), so its
+// package (same situation as DETACHED_PROCESS in internal/daemon), so its
 // documented raw value is used directly here.
 const createNoWindow = 0x08000000
 

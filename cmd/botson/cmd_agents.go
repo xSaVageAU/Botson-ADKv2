@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"botsonv2/core/agent"
-	"botsonv2/core/management"
+	"botsonv2/internal/agent"
+	"botsonv2/internal/management"
 
 	"github.com/spf13/cobra"
 )

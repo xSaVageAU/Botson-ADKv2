@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"botsonv2/core/daemon"
-	"botsonv2/core/interface/apiclient"
-	tuiinterface "botsonv2/core/interface/tui"
+	"botsonv2/internal/daemon"
+	"botsonv2/internal/interface/apiclient"
+	tuiinterface "botsonv2/internal/interface/tui"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"

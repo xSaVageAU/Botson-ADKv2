@@ -1,7 +1,7 @@
 package main
 
 import (
-	"botsonv2/core/setup"
+	"botsonv2/internal/setup"
 
 	"github.com/spf13/cobra"
 )

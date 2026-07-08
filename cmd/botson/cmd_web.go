@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"botsonv2/core/daemon"
-	"botsonv2/core/interface/discord"
-	webui "botsonv2/core/interface/web"
+	"botsonv2/internal/daemon"
+	"botsonv2/internal/interface/discord"
+	webui "botsonv2/internal/interface/web"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/adk/v2/cmd/launcher/universal"
@@ -118,7 +118,7 @@ func newWebStatusCmd() *cobra.Command {
 }
 
 // runWeb starts Botson's unified core and registers it in the shared
-// daemon-state/control-channel system (core/daemon) so `botson web
+// daemon-state/control-channel system (internal/daemon) so `botson web
 // status/stop` -- and other clients looking for a core to attach to, like
 // `botson tui` -- can find and manage it. This happens no matter how the
 // process was launched: directly (`botson web`), detached (`web start`),
@@ -160,7 +160,7 @@ func runWeb(ctx context.Context, port int, otelToCloud bool) error {
 // takes over the terminal.
 func runCoreServer(ctx context.Context, port int, otelToCloud bool, quiet bool) error {
 	// Register this process as Botson's core so the Discord gateway can be
-	// started/stopped in-process (core/interface/discord/singleton.go)
+	// started/stopped in-process (internal/interface/discord/singleton.go)
 	// instead of as a separate OS process.
 	discord.InitCore(boot.Launcher)
 

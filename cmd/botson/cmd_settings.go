@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"botsonv2/core/config"
-	"botsonv2/core/management"
+	"botsonv2/internal/config"
+	"botsonv2/internal/management"
 
 	"github.com/spf13/cobra"
 )

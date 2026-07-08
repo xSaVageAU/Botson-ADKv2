@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"botsonv2/core/scripts"
+	"botsonv2/internal/scripts"
 
 	"github.com/spf13/cobra"
 )

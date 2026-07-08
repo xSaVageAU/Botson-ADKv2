@@ -6,9 +6,9 @@ import (
 	"log"
 	"strconv"
 
-	"botsonv2/core/daemon"
-	"botsonv2/core/interface/apiclient"
-	"botsonv2/core/interface/discord"
+	"botsonv2/internal/daemon"
+	"botsonv2/internal/interface/apiclient"
+	"botsonv2/internal/interface/discord"
 
 	"github.com/spf13/cobra"
 )
@@ -33,7 +33,7 @@ func noBootstrap(cmd *cobra.Command, args []string) error { return nil }
 
 // discordCoreClient builds an HTTP client for the currently-running core.
 // `discord start/stop/status` always mean "toggle/query Discord within
-// the running core" now (see core/interface/discord/singleton.go) -- not
+// the running core" now (see internal/interface/discord/singleton.go) -- not
 // "spawn a separate process" as they used to -- so there's nothing to
 // fall back to if no core is running; erroring clearly here is better
 // than silently doing something different from what the web console's
