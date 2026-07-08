@@ -24,7 +24,7 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
     - **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
   - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, config, dashboard stats, Discord daemon control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions.
   - **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation state. See [docs/sessions.md](./docs/sessions.md) for the full schema/API reference.
-  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`).
+  - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `writeFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`, `runCommand`). `readFile`/`writeFile` share path validation via `resolveWorkspacePath` (`workspace.go`) — the one place that confines a tool to the workspace root and blocks `.env` access, so fix path-safety bugs there rather than per-tool.
 
 ## Architecture / how it works
 
@@ -43,9 +43,15 @@ A bare `botson` (no subcommand) runs whichever interface `config.AppConfig.Defau
 
 This is what makes the `updateSettings` agent tool (`core/tools/update_settings.go`) meaningful: the running agent can change its own model/root-agent/default-command mid-conversation and have it actually take effect for the rest of that process's life, not just on next launch. It deliberately excludes secrets (Gemini API key, Discord token/owner) — those stay human-controlled via `botson settings set` or the web console, so a confused or compromised agent can't rotate or wipe its own credentials. `RequireConfirmation: true` is set on its registry entry (`core/agent/registry.go`), same as `saveArtifact`, so it still pauses for a HITL approval before taking effect.
 
+## Coding/exec tools
+
+`writeFile` and `runCommand` (`core/tools/write_file.go`, `core/tools/run_command.go`) give the agent real editing and shell-execution capability in the project workspace, on top of the earlier read-only `readFile`/`listFiles`. Both default to `RequireConfirmation: true` in the registry, same posture as `saveArtifact`/`updateSettings` — this was a deliberate choice (2026-07) since it's the biggest capability jump in the tool registry so far, not because the code backing them is untrusted.
+
+`runCommand` runs the given string through the platform's own shell (`/bin/sh -c` / `cmd /C`) in the workspace root, with a timeout (default 120s, capped output at ~200KB to protect the agent's own context). It sets `setNewProcessGroup` (`run_command_unix.go` / `run_command_windows.go`) before running: `exec.CommandContext`'s cancellation only kills the *direct* child process, so a shell command that forks rather than exec-replaces itself (observed with `sh -c "sleep 5"` on this box) would otherwise leave the actual work running past the shell's own death, keeping the captured stdout/stderr pipe open until it exits on its own — silently defeating the timeout. Killing the whole process group on cancel fixes that; see `core/tools/run_command_test.go`'s timeout case for the regression test.
+
 ## Platform-specific files
 
-Windows-only functionality (tray icon, autostart registration, uninstall self-delete helper) is split via Go build tags into `_windows.go` / `_unix.go` / `_other.go` files (e.g. `tray_windows.go` vs `tray_other.go`, `autostart_windows.go` vs `autostart_unix.go`). When adding a platform-specific feature, follow this pattern rather than runtime `if runtime.GOOS` branching inside shared files, except where the branch is small and genuinely one-off (e.g. the tray-specific prompts inside `core/setup/install.go`'s `Install`).
+Windows-only functionality (tray icon, autostart registration, uninstall self-delete helper, `runCommand`'s process-group kill) is split via Go build tags into `_windows.go` / `_unix.go` / `_other.go` files (e.g. `tray_windows.go` vs `tray_other.go`, `autostart_windows.go` vs `autostart_unix.go`, `run_command_windows.go` vs `run_command_unix.go`). When adding a platform-specific feature, follow this pattern rather than runtime `if runtime.GOOS` branching inside shared files, except where the branch is small and genuinely one-off (e.g. the tray-specific prompts inside `core/setup/install.go`'s `Install`, or the shell/flag selection in `core/tools/run_command.go`).
 
 The non-Windows `tray` command (`cmd/botson/tray_other.go`) is registered with `Hidden: true` so it doesn't clutter `botson help` where it can't do anything — it still runs and returns a clear "Windows only" error if invoked directly.
 
