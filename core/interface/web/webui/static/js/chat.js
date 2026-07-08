@@ -222,7 +222,7 @@ window.selectSession = async function(sessionId) {
 window.startNewSession = async function() {
   if (!window.activeAgent) return;
 
-  window.activeSessionId = crypto.randomUUID();
+  window.activeSessionId = window.generateUUID();
   window.isNewSession = true;
 
   document.getElementById('sessionPill').textContent = window.activeSessionId;

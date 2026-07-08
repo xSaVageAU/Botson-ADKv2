@@ -149,6 +149,31 @@ window.switchView = async function (viewName) {
 };
 
 // Global Helpers
+
+// crypto.randomUUID() is only defined in a "secure context" (HTTPS, or
+// http://localhost) -- it throws "crypto.randomUUID is not a function"
+// over plain http://<lan-ip>, which is exactly how this console is
+// typically reached on a home network. crypto.getRandomValues() has no
+// such restriction, so it's used as a manual UUIDv4 fallback instead of
+// requiring HTTPS just to start a new chat session.
+window.generateUUID = function () {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+};
+
 window.escapeHtml = function (str) {
   if (str === null || str === undefined) return '';
   return String(str)
