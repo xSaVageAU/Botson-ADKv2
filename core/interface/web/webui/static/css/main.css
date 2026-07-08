@@ -27,6 +27,17 @@
   --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
   --accent-teal-soft: color-mix(in srgb, var(--accent-teal) 15%, transparent);
   --danger-soft: color-mix(in srgb, var(--danger) 15%, transparent);
+  --accent-light: color-mix(in srgb, var(--accent) 45%, transparent);
+  --green-soft: color-mix(in srgb, var(--green) 15%, transparent);
+
+  /* Aliases kept for older call sites -- these five were referenced
+     throughout main.css/chat.css but never actually defined, so anything
+     using them (focus rings, card shadows, the settings card background)
+     was silently falling back to an invalid/inherited value. */
+  --bg-card: var(--panel-raised);
+  --text-muted: var(--text-dim);
+  --font-sans: var(--font-body);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
 
   --radius-sm: 5px;
   --radius: 8px;
@@ -896,101 +907,3 @@ select option {
   .sub-rail { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
 }
 
-/* ==================== HITL CONFIRMATION STYLES ==================== */.hitl-card {
-  background: var(--panel);
-  border: 1px solid var(--accent-light);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin: 12px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 500px;
-  box-shadow: var(--shadow-sm);
-  animation: slideIn 0.2s ease;
-}
-
-.hitl-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-family: var(--font-display);
-  font-size: 14px;
-  color: var(--accent);
-}
-
-.hitl-body {
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-
-.hitl-details {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.hitl-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.hitl-btn {
-  flex: 1;
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  text-align: center;
-}
-
-.hitl-btn-approve {
-  background: var(--green);
-  color: white;
-}
-.hitl-btn-approve:hover:not(:disabled) {
-  background: #059669;
-}
-
-.hitl-btn-deny {
-  background: var(--danger);
-  color: white;
-}
-.hitl-btn-deny:hover:not(:disabled) {
-  background: #dc2626;
-}
-
-.hitl-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.hitl-status {
-  font-size: 13px;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-}
-.hitl-status-approved {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--green);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-.hitl-status-denied {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}

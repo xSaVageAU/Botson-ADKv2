@@ -661,12 +661,15 @@ window.appendToolTrace = function(name, output) {
   }
 
   card.innerHTML = `
-    <div class="tool-header">
-      <span class="tool-name-pill">⚙ ${window.escapeHtml(name)}</span>
-      <span class="tool-status">COMPLETED</span>
-    </div>
+    <button class="tool-trace-toggle" type="button">
+      <span class="tool-trace-icon">⚙</span>
+      <span class="tool-trace-name">${window.escapeHtml(name)}</span>
+      <span class="tool-trace-status">Completed</span>
+      <span class="tool-trace-chevron">▸</span>
+    </button>
     <pre class="tool-body">${window.escapeHtml(formattedOutput)}</pre>
   `;
+  card.querySelector('.tool-trace-toggle').onclick = () => card.classList.toggle('expanded');
 
   row.appendChild(card);
   logEl.appendChild(row);
@@ -678,7 +681,13 @@ window.appendToolCallIndication = function(toolName) {
   if (!logEl) return;
   const row = document.createElement('div');
   row.className = 'message-row system';
-  row.innerHTML = `<div style="font-size: 12px; color: var(--text-faint); font-style: italic; padding: 4px 8px;">⚙️ Agent is executing tool: <code>${toolName}</code>...</div>`;
+  row.innerHTML = `
+    <div class="tool-pill">
+      <span class="tool-pill-icon">⚙</span>
+      <span class="tool-pill-name">${window.escapeHtml(toolName)}</span>
+      <span class="tool-pill-spinner"></span>
+    </div>
+  `;
   logEl.appendChild(row);
   logEl.scrollTop = logEl.scrollHeight;
 };
@@ -690,21 +699,16 @@ window.appendHitlResolved = function(fc, confirmed) {
   const row = document.createElement('div');
   row.className = 'message-row system';
 
-  const card = document.createElement('div');
-  card.className = 'hitl-card';
-  card.style.borderColor = confirmed ? 'var(--green)' : 'var(--danger)';
+  const toolName = fc.args.originalFunctionCall?.name || 'tool';
+  const pill = document.createElement('div');
+  pill.className = `hitl-resolved-pill ${confirmed ? 'hitl-resolved-approved' : 'hitl-resolved-denied'}`;
+  pill.innerHTML = `
+    <span class="hitl-resolved-icon">${confirmed ? '✓' : '✗'}</span>
+    <span class="hitl-resolved-name">${window.escapeHtml(toolName)}</span>
+    <span>${confirmed ? 'approved' : 'denied'}</span>
+  `;
 
-  const header = document.createElement('div');
-  header.className = 'hitl-header';
-  header.innerHTML = `⚙️ Resolved Tool Call: <code>${fc.args.originalFunctionCall?.name || 'tool'}</code>`;
-  
-  const status = document.createElement('div');
-  status.className = confirmed ? 'hitl-status hitl-status-approved' : 'hitl-status hitl-status-denied';
-  status.textContent = confirmed ? '✓ Execution Approved' : '✗ Execution Denied';
-  
-  card.appendChild(header);
-  card.appendChild(status);
-  row.appendChild(card);
+  row.appendChild(pill);
   logEl.appendChild(row);
   logEl.scrollTop = logEl.scrollHeight;
 };
@@ -720,37 +724,51 @@ window.appendHitlPending = function(fc) {
   card.className = 'hitl-card';
   card.id = `hitl-${fc.id}`;
 
+  const toolName = fc.args.originalFunctionCall?.name || 'tool';
+
   const header = document.createElement('div');
   header.className = 'hitl-header';
-  header.innerHTML = `⚠️ Agent Requesting Permission`;
+  header.innerHTML = `
+    <span class="hitl-icon">⚠</span>
+    <div class="hitl-heading">
+      <span class="hitl-title">Permission requested</span>
+      <span class="hitl-subtitle">${window.escapeHtml(toolName)}</span>
+    </div>
+  `;
 
   const body = document.createElement('div');
   body.className = 'hitl-body';
   body.textContent = fc.args.hint || 'The agent requires approval to execute this tool.';
 
+  const detailsWrap = document.createElement('details');
+  detailsWrap.className = 'hitl-details-wrap';
+  const summary = document.createElement('summary');
+  summary.textContent = 'View arguments';
   const details = document.createElement('pre');
   details.className = 'hitl-details';
   details.textContent = JSON.stringify(fc.args.originalFunctionCall || {}, null, 2);
+  detailsWrap.appendChild(summary);
+  detailsWrap.appendChild(details);
 
   const actions = document.createElement('div');
   actions.className = 'hitl-actions';
-
-  const approveBtn = document.createElement('button');
-  approveBtn.className = 'hitl-btn hitl-btn-approve';
-  approveBtn.textContent = 'Approve';
-  approveBtn.onclick = () => window.sendConfirmation(fc.id, true);
 
   const denyBtn = document.createElement('button');
   denyBtn.className = 'hitl-btn hitl-btn-deny';
   denyBtn.textContent = 'Deny';
   denyBtn.onclick = () => window.sendConfirmation(fc.id, false);
 
-  actions.appendChild(approveBtn);
+  const approveBtn = document.createElement('button');
+  approveBtn.className = 'hitl-btn hitl-btn-approve';
+  approveBtn.textContent = 'Approve';
+  approveBtn.onclick = () => window.sendConfirmation(fc.id, true);
+
   actions.appendChild(denyBtn);
+  actions.appendChild(approveBtn);
 
   card.appendChild(header);
   card.appendChild(body);
-  card.appendChild(details);
+  card.appendChild(detailsWrap);
   card.appendChild(actions);
   row.appendChild(card);
 
