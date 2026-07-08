@@ -8,6 +8,7 @@
     "loadArtifacts",
     "updateSettings",
     "writeFile",
+    "editFile",
     "runCommand",
     "saveScript",
     "runScript"

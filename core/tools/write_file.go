@@ -30,6 +30,10 @@ func WriteFile(ctx agent.Context, args WriteFileArgs) (WriteFileResult, error) {
 		return WriteFileResult{}, err
 	}
 
+	if err := requireFileReadBeforeWrite(ctx, fullPath); err != nil {
+		return WriteFileResult{}, err
+	}
+
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 		return WriteFileResult{}, fmt.Errorf("failed to create parent directories: %w", err)
 	}
@@ -37,6 +41,8 @@ func WriteFile(ctx agent.Context, args WriteFileArgs) (WriteFileResult, error) {
 	if err := os.WriteFile(fullPath, []byte(args.Content), 0644); err != nil {
 		return WriteFileResult{}, fmt.Errorf("failed to write file: %w", err)
 	}
+
+	markFileRead(ctx, fullPath)
 
 	return WriteFileResult{
 		FilePath:     fullPath,
