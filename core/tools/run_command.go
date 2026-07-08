@@ -1,15 +1,14 @@
 package tools
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 	"time"
+
+	"botsonv2/core/procutil"
 
 	"google.golang.org/adk/v2/agent"
 )
@@ -28,13 +27,6 @@ type RunCommandResult struct {
 	ExitCode int    `json:"exitCode"`
 }
 
-const (
-	defaultCommandTimeout = 120 * time.Second
-	// maxCommandOutputBytes guards against a runaway command (e.g. an
-	// accidental infinite-output loop) blowing up the agent's context.
-	maxCommandOutputBytes = 200_000
-)
-
 // RunCommand lets the agent execute an arbitrary shell command in the
 // project workspace -- builds, tests, git, and anything else a CLI could
 // do. Runs via the platform's own shell so pipes/redirects/&& work exactly
@@ -51,14 +43,6 @@ func runCommand(ctx context.Context, args RunCommandArgs) (RunCommandResult, err
 		return RunCommandResult{}, fmt.Errorf("command must not be empty")
 	}
 
-	timeout := defaultCommandTimeout
-	if args.TimeoutSeconds > 0 {
-		timeout = time.Duration(args.TimeoutSeconds) * time.Second
-	}
-
-	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	root, err := os.Getwd()
 	if err != nil {
 		return RunCommandResult{}, fmt.Errorf("failed to get current working directory: %w", err)
@@ -69,43 +53,22 @@ func runCommand(ctx context.Context, args RunCommandArgs) (RunCommandResult, err
 		shell, shellFlag = "cmd", "/C"
 	}
 
-	cmd := exec.CommandContext(cmdCtx, shell, shellFlag, args.Command)
-	cmd.Dir = root
-	setNewProcessGroup(cmd)
+	var timeout time.Duration
+	if args.TimeoutSeconds > 0 {
+		timeout = time.Duration(args.TimeoutSeconds) * time.Second
+	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	runErr := cmd.Run()
-
-	exitCode := 0
-	if runErr != nil {
-		var exitErr *exec.ExitError
-		switch {
-		// Checked before the generic *exec.ExitError case below: a process
-		// killed because its deadline expired also surfaces as an
-		// *exec.ExitError (e.g. "signal: killed"), so without this ordering
-		// a timeout would be silently reported as a normal exit.
-		case cmdCtx.Err() == context.DeadlineExceeded:
-			return RunCommandResult{}, fmt.Errorf("command timed out after %s", timeout)
-		case errors.As(runErr, &exitErr):
-			exitCode = exitErr.ExitCode()
-		default:
-			return RunCommandResult{}, fmt.Errorf("failed to run command: %w", runErr)
-		}
+	result, err := procutil.Run(ctx, shell, []string{shellFlag, args.Command}, procutil.RunOptions{
+		Dir:     root,
+		Timeout: timeout,
+	})
+	if err != nil {
+		return RunCommandResult{}, err
 	}
 
 	return RunCommandResult{
-		Stdout:   truncateOutput(stdout.String()),
-		Stderr:   truncateOutput(stderr.String()),
-		ExitCode: exitCode,
+		Stdout:   result.Stdout,
+		Stderr:   result.Stderr,
+		ExitCode: result.ExitCode,
 	}, nil
-}
-
-func truncateOutput(s string) string {
-	if len(s) <= maxCommandOutputBytes {
-		return s
-	}
-	return s[:maxCommandOutputBytes] + fmt.Sprintf("\n... [truncated, %d bytes total]", len(s))
 }

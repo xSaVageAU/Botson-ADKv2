@@ -8,6 +8,8 @@
     "loadArtifacts",
     "updateSettings",
     "writeFile",
-    "runCommand"
+    "runCommand",
+    "saveScript",
+    "runScript"
   ]
 }
