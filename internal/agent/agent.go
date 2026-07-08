@@ -25,4 +25,3 @@ func LoadDefaultAgents(model model.LLM) (agent.Loader, error) {
 func GetDefaultAgentsFS() embed.FS {
 	return defaultAgentsFS
 }
-

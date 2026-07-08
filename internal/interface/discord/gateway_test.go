@@ -8,7 +8,7 @@ import (
 
 func TestNewGateway(t *testing.T) {
 	config := &launcher.Config{}
-	
+
 	// Should initialize the struct correctly (but not start connection without token)
 	gw, err := New("dummy_token", config)
 	if err != nil {

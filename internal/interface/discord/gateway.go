@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
 	"botsonv2/internal/config"
+	"github.com/bwmarrin/discordgo"
 	"google.golang.org/adk/v2/cmd/launcher"
 )
 

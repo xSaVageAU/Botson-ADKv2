@@ -25,7 +25,9 @@ func (b *botsonSublauncher) Parse(args []string) ([]string, error) {
 }
 
 func (b *botsonSublauncher) CommandLineSyntax() string { return "" }
-func (b *botsonSublauncher) SimpleDescription() string  { return "starts the unified Botson Workspace Console" }
+func (b *botsonSublauncher) SimpleDescription() string {
+	return "starts the unified Botson Workspace Console"
+}
 
 func (b *botsonSublauncher) SetupSubrouters(router *mux.Router, config *launcher.Config) error {
 	pathPrefix := "/botson/"

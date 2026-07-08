@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"botsonv2/internal/config"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"botsonv2/internal/config"
 	"google.golang.org/adk/v2/session"
 )
 

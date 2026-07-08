@@ -199,8 +199,6 @@ func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 		}
 	}
 
-
-
 	// 4. Find root agent and compile otherAgents list (filtering out private agents)
 	appConfig, errCfg := config.Load()
 	rootAgentName := ""

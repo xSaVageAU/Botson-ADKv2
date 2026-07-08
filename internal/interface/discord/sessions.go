@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/google/uuid"
 	"botsonv2/internal/config"
+	"github.com/google/uuid"
 	"google.golang.org/adk/v2/session"
 )
 
@@ -119,7 +119,7 @@ func (g *Gateway) getChannelSessions(ctx context.Context, channelID, agentName s
 			continue
 		}
 		var metaMap map[string]any
-		
+
 		// Handle potential database driver parsing variants
 		switch v := val.(type) {
 		case map[string]any:

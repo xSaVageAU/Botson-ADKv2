@@ -6,8 +6,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/bwmarrin/discordgo"
 	"botsonv2/internal/config"
+	"github.com/bwmarrin/discordgo"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/genai"
