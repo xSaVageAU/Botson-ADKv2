@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"botsonv2/core/config"
@@ -35,9 +34,7 @@ func newSettingsGetCmd() *cobra.Command {
 				return err
 			}
 			if asJSON {
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetIndent("", "  ")
-				return enc.Encode(cfg)
+				return encodeJSON(cmd, cfg)
 			}
 			printSettingsSummary(cfg)
 			return nil
@@ -96,9 +93,7 @@ func newSettingsSetCmd() *cobra.Command {
 
 			masked := config.Mask(cfg)
 			if asJSON {
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetIndent("", "  ")
-				return enc.Encode(masked)
+				return encodeJSON(cmd, masked)
 			}
 			fmt.Println("Settings updated.")
 			printSettingsSummary(&masked)
