@@ -2,37 +2,56 @@ package management
 
 import (
 	"os"
+	"time"
 
 	"botsonv2/core/daemon"
+	"botsonv2/core/interface/discord"
 )
 
-const discordDaemonID = "discord"
 const discordDaemonDisplayName = "Discord gateway"
 
-// discordDaemonChildArgs is the argv used to relaunch the current executable
-// as the detached Discord gateway process.
-var discordDaemonChildArgs = []string{"discord", "__daemon-child"}
+// discordStartedAt records when the in-process gateway was last started,
+// purely for DiscordDaemonStatus's StartedAt field -- there's no separate
+// process to read this back from once Discord runs in-process, so it's
+// tracked here instead.
+var discordStartedAt time.Time
 
-// StartDiscordDaemon launches the Discord gateway as a detached background
-// process, waiting for it to report itself ready. Runs from the calling
-// process's own current directory, so the gateway's tools operate on
-// whatever workspace the caller was actually in.
+// StartDiscordDaemon starts the Discord gateway in-process within the
+// core (see core/interface/discord.StartGateway) rather than spawning a
+// separate OS process. The exported name/signature are unchanged from
+// when this did spawn a process, so cmd/botson/cmd_discord.go and
+// core/interface/web/api_dashboard.go need no changes -- only the
+// implementation underneath. pid/logPath are vestigial now (the gateway
+// shares the core's own PID and logs interleave with the core's own
+// stdout) but kept for backward compatibility with existing callers.
 func StartDiscordDaemon() (pid int, logPath string, err error) {
-	dir, err := os.Getwd()
-	if err != nil {
+	if err := discord.StartGateway(); err != nil {
 		return 0, "", err
 	}
-	return daemon.Start(discordDaemonID, discordDaemonDisplayName, dir, discordDaemonChildArgs)
+	discordStartedAt = time.Now()
+	return os.Getpid(), "", nil
 }
 
-// StopDiscordDaemon asks the background Discord gateway to shut down
-// gracefully, or force-kills it if force is true.
+// StopDiscordDaemon stops the in-process Discord gateway. force is
+// accepted for backward compatibility with the old separate-process
+// signature but has no effect -- stopping an in-process goroutine has no
+// "graceful vs. force" distinction the way killing an OS process does.
 func StopDiscordDaemon(force bool) error {
-	return daemon.Stop(discordDaemonID, discordDaemonDisplayName, force)
+	return discord.StopGateway()
 }
 
-// DiscordDaemonStatus reports whether the background Discord gateway is
-// currently running.
+// DiscordDaemonStatus reports whether the in-process Discord gateway is
+// currently running, in the same daemon.Status shape callers already
+// expect (so JSON responses to the web console are unchanged).
 func DiscordDaemonStatus() (daemon.Status, error) {
-	return daemon.GetStatus(discordDaemonID, discordDaemonDisplayName)
+	if !discord.GatewayStatus() {
+		return daemon.Status{ID: "discord", DisplayName: discordDaemonDisplayName}, nil
+	}
+	return daemon.Status{
+		ID:          "discord",
+		DisplayName: discordDaemonDisplayName,
+		Running:     true,
+		PID:         os.Getpid(),
+		StartedAt:   discordStartedAt,
+	}, nil
 }

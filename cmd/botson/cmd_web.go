@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"botsonv2/core/daemon"
+	"botsonv2/core/interface/discord"
 	webui "botsonv2/core/interface/web"
 
 	"github.com/spf13/cobra"
@@ -151,6 +152,11 @@ func newWebStatusCmd() *cobra.Command {
 }
 
 func runWeb(ctx context.Context, port int, otelToCloud bool) error {
+	// Register this process as Botson's core so the Discord gateway can be
+	// started/stopped in-process (core/interface/discord/singleton.go)
+	// instead of as a separate OS process.
+	discord.InitCore(boot.Launcher)
+
 	// We configure the launcher with only ADK's production sublaunchers (REST and A2A) and our custom console
 	customLauncher := universal.NewLauncher(
 		web.NewLauncher(

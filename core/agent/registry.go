@@ -78,6 +78,13 @@ var availableTools = map[string]toolBuilder{
 			RequireConfirmation: true,
 		}, tools.RunScript)
 	},
+	"toggleDiscord": func() (tool.Tool, error) {
+		return functiontool.New(functiontool.Config{
+			Name:                "toggleDiscord",
+			Description:         "Starts or stops Botson's Discord gateway. action must be 'start' or 'stop'. Requires a Discord bot token to already be configured.",
+			RequireConfirmation: true,
+		}, tools.ToggleDiscord)
+	},
 }
 
 // GetAvailableTools returns the sorted list of all registered tool names in the registry.

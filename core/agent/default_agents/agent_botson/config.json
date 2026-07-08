@@ -11,6 +11,7 @@
     "editFile",
     "runCommand",
     "saveScript",
-    "runScript"
+    "runScript",
+    "toggleDiscord"
   ]
 }
