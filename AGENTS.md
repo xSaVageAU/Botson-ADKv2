@@ -122,6 +122,17 @@ botson settings set [--json] --model X --root-agent Y --default-command tui|web|
 ```
 Thin CLI wrapper over `core/management`'s `GetMaskedConfig`/`UpdateConfig` (the same functions the web Settings tab uses). `get` prints a masked summary or, with `--json`, the same masked struct as JSON. `set` only touches the flags you actually pass (checked via `cmd.Flags().Changed(...)`, same pattern as `setup install --non-interactive`) — everything else keeps its current value. Both skip the full agent/model bootstrap (`PersistentPreRunE: noBootstrap`), same reasoning as `setup`: a broken or missing config is exactly the thing `settings set` needs to be usable to fix.
 
+### Agents
+
+```bash
+botson agents list [--json]
+botson agents show <name> [--json]
+botson agents tools [--json]
+botson agents create --name X [--description Y] [--tools a,b,c] [--instructions "..." | --instructions-file path] [--private] [--json]
+botson agents delete <name>
+```
+Thin CLI wrapper over `core/management/agents.go`'s `ListAgents`/`SaveAgent`/`DeleteAgent`/`ListTools` — the same functions the web Builder tab already used, now with a CLI front door too. `create` always writes a full replacement (`config.json` + `instructions.md` under `~/.botsonv2/agents/<name>/`) rather than a partial patch — there's no existing per-field "only touch what I pass" merge for agents the way `settings set`/`setup install` have for config, so re-running `create` on an existing name overwrites its description/tools/instructions wholesale. `tools` lists the exact strings valid in `--tools` (the standard registry from `core/agent/registry.go` plus any other agent name, for sub-agent delegation). `delete` only affects custom user agents — bundled defaults have no user-directory counterpart to remove, and return `management.ErrAgentNotFound`. None of these need the Gemini/agent bootstrap (`PersistentPreRunE: noBootstrap`).
+
 ### Standalone binaries
 
 ```bash
