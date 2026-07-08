@@ -22,8 +22,8 @@ Botson is a Go-based agent framework built on Google's **ADK v2**, exposing the 
     - **[`/web`](./core/interface/web/)**: serves the unified SPA console — embedded files, custom API handlers (`api_builder.go`, `api_dashboard.go`), sublauncher routing.
     - **[`/discord`](./core/interface/discord/)**: Discord Gateway listener, command handlers (`commands.go`), security locks (`handlers.go`), DB/disk session persistence (`sessions.go`), HITL confirms (`hitl.go`), disk-persisted pending-authorization requests (`pending.go`).
     - **[`/tui`](./core/interface/tui/)**: Bubble Tea terminal chat interface. Callers assemble the agent/session/artifact plumbing and hand off to `tui.Run(...)`.
-  - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, config, dashboard stats, Discord daemon control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions.
-  - **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation state. See [docs/sessions.md](./docs/sessions.md) for the full schema/API reference.
+  - **[`/management`](./core/management/)**: shared, interface-agnostic business logic (agents, sessions, config, dashboard stats, Discord daemon control) callable from both the web API and the CLI, so `botson` and the webui always drive the exact same functions. `ListSessions`/`GetSession`/`DeleteSession` (`sessions.go`) only need a `session.Service`, not the full Gemini/agent-loader bootstrap `GetDashboardStats` needs — same reasoning as `ListAgents`.
+  - **[`/session`](./core/session/)**: GORM & SQLite implementation for persisting conversation state. `InitPersistentSessionService` silences GORM's default logger (it writes to stdout, not stderr) at construction, since every consumer -- CLI JSON output, the TUI's alt-screen -- would otherwise get corrupted by it; don't reintroduce a per-consumer workaround for this (the TUI used to have one, an unsafe-reflection hack, removed once this was fixed at the source). See [docs/sessions.md](./docs/sessions.md) for the full schema/API reference.
   - **[`/tools`](./core/tools/)**: secure tools (`listFiles`, `readFile`, `writeFile`, `loadArtifacts`, `saveArtifact`, `updateSettings`, `runCommand`, `saveScript`, `runScript`). `readFile`/`writeFile` share path validation via `resolveWorkspacePath` (`workspace.go`) — the one place that confines a tool to the workspace root and blocks `.env` access, so fix path-safety bugs there rather than per-tool.
   - **[`/procutil`](./core/procutil/)**: `Run(ctx, name, args, opts)` — runs a subprocess with a timeout that actually works (kills the whole process group, not just the direct child) and truncates captured output. Leaf package (only depends on the stdlib), shared by `core/tools`' `runCommand` and `core/scripts`' script runner so this exec-safety logic exists in exactly one place.
   - **[`/scripts`](./core/scripts/)**: the named-script system — `List`/`Save`/`Delete`/`Run` over `~/.botsonv2/scripts/<name>/main.go` + a `script.json` sidecar for the description. Another leaf package (only depends on `core/config` and `core/procutil`), so both `cmd/botson` and `core/tools` (`saveScript`/`runScript`) can use it directly without an import cycle.
@@ -155,6 +155,15 @@ botson script delete <name>
 botson script run <name> [--timeout N] [-- args...]
 ```
 Thin CLI wrapper over `core/scripts` — see "Named scripts" above for what a script actually is and why `Run` builds-then-executes instead of `go run`. `run`'s flag parsing uses `SetInterspersed(false)` so anything after `<name>`, flag-shaped or not, passes straight through to the script rather than `botson` trying to parse it as its own flag; a leading `--` (the conventional kubectl/docker-exec-style separator) is stripped by hand since Cobra doesn't do that itself once interspersed parsing is off. `--timeout` (botson's own flag, must come *before* `<name>`) only bounds the script's own execution — the build step always gets a separate, generous flat timeout, since `timeoutSeconds` describes the program's logic, not how long compiling it takes.
+
+### Sessions
+
+```bash
+botson sessions list [--agent NAME] [--user ID] [--json]
+botson sessions show <session-id> --agent NAME --user ID [--json]
+botson sessions delete <session-id> --agent NAME --user ID
+```
+Thin CLI wrapper over `core/management`'s `ListSessions`/`GetSession`/`DeleteSession`, built directly on `core/session.InitPersistentSessionService` + `management.ListAgents()` rather than the full Gemini/agent-loader bootstrap — so, like `settings`/`agents`/`scripts`, it works even without a configured API key. A session's true identity is the composite key `(AppName, UserID, SessionID)` (see [docs/sessions.md](./docs/sessions.md)), not just the ID alone, which is why `show`/`delete` require `--agent`/`--user` — get those from `list`'s output first. `list`'s `eventCount` is always `0`: the underlying ADK `List` call doesn't preload events (only `Get` does, which `show` uses) — a pre-existing characteristic of the library, not a bug specific to this CLI, and the same limitation `core/management.GetDashboardStats`'s web dashboard stats already have.
 
 ### Standalone binaries
 
