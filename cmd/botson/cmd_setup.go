@@ -21,13 +21,59 @@ func newSetupCmd() *cobra.Command {
 }
 
 func newSetupInstallCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		nonInteractive bool
+		geminiAPIKey   string
+		modelName      string
+		rootAgent      string
+		discord        bool
+		discordToken   string
+		discordOwnerID string
+		trayAutostart  bool
+		startTray      bool
+	)
+
+	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Interactively configure Botson and install it onto this machine",
+		Long: "Interactively configure Botson and install it onto this machine.\n\n" +
+			"Pass --non-interactive along with the flags below to drive this from a script " +
+			"or another agent instead of answering prompts. Any flag left unset falls back " +
+			"to whatever's already in the config (or a built-in default on a fresh install) " +
+			"rather than prompting for it.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return setup.Install(cmd.Context())
+			opts := setup.InstallOptions{
+				NonInteractive: nonInteractive,
+				GeminiAPIKey:   geminiAPIKey,
+				ModelName:      modelName,
+				RootAgent:      rootAgent,
+				DiscordToken:   discordToken,
+				DiscordOwnerID: discordOwnerID,
+			}
+			if cmd.Flags().Changed("discord") {
+				opts.Discord = &discord
+			}
+			if cmd.Flags().Changed("tray-autostart") {
+				opts.RegisterTrayAutostart = &trayAutostart
+			}
+			if cmd.Flags().Changed("start-tray") {
+				opts.StartTrayNow = &startTray
+			}
+			return setup.Install(cmd.Context(), opts)
 		},
 	}
+
+	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Skip all prompts; use the flags below instead of asking")
+	cmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Gemini API key (required on a first install if --non-interactive)")
+	cmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (default: gemini-3.1-flash-lite)")
+	cmd.Flags().StringVar(&rootAgent, "root-agent", "", "Root agent name (default: Agent Botson)")
+	cmd.Flags().BoolVar(&discord, "discord", false, "Enable (true) or disable (false) Discord integration; omit to leave existing Discord config untouched")
+	cmd.Flags().StringVar(&discordToken, "discord-token", "", "Discord bot token (required if --discord=true and none is already configured)")
+	cmd.Flags().StringVar(&discordOwnerID, "discord-owner-id", "", "Discord owner user ID")
+	cmd.Flags().BoolVar(&trayAutostart, "tray-autostart", false, "Register the tray icon to start at login (Windows only)")
+	cmd.Flags().BoolVar(&startTray, "start-tray", false, "Start the tray icon immediately after install (Windows only)")
+
+	return cmd
 }
 
 func newSetupUninstallCmd() *cobra.Command {
