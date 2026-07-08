@@ -159,18 +159,27 @@ window.selectSession = async function(sessionId) {
       const logEl = document.getElementById('chatLog');
       logEl.innerHTML = ''; // clear welcome
 
-      // 1. Scan chronologically to identify which adk_request_confirmation calls have been answered
+      // 1. Scan chronologically to build lookup tables keyed by function
+      // call id: which adk_request_confirmation calls have been answered,
+      // and what every regular tool call's result actually was. Without
+      // the second table, a saved (i.e. already-finished) tool call has
+      // no way to be told apart from one still in flight -- which is why
+      // this used to always render the "running" indicator forever, even
+      // for a call that completed the moment it happened.
       const answeredConfirmations = {};
+      const functionResults = {};
       sessionData.events.forEach(ev => {
         if (ev.content && ev.content.parts) {
           ev.content.parts.forEach(part => {
-            if (part.functionResponse && part.functionResponse.name === 'adk_request_confirmation') {
-              const callId = part.functionResponse.id;
+            if (!part.functionResponse) return;
+            if (part.functionResponse.name === 'adk_request_confirmation') {
               const resp = part.functionResponse.response || {};
-              answeredConfirmations[callId] = {
+              answeredConfirmations[part.functionResponse.id] = {
                 confirmed: resp.confirmed === true || resp.confirmed === 'true',
                 responder: ev.author
               };
+            } else {
+              functionResults[part.functionResponse.id] = part.functionResponse.response;
             }
           });
         }
@@ -199,9 +208,16 @@ window.selectSession = async function(sessionId) {
                 } else {
                   window.appendHitlPending(part.functionCall);
                 }
+              } else if (Object.prototype.hasOwnProperty.call(functionResults, part.functionCall.id)) {
+                // A saved conversation only ever contains finished calls --
+                // render the actual result, collapsed by default, same as
+                // a live trace.
+                window.appendToolTrace(part.functionCall.name, JSON.stringify(functionResults[part.functionCall.id]));
               } else {
-                // Render standard tool call indication
-                window.appendToolCallIndication(part.functionCall.name);
+                // No matching response was found (e.g. the process was
+                // interrupted mid-call) -- say so rather than showing a
+                // spinner that will never resolve.
+                window.appendToolTrace(part.functionCall.name, '(no result recorded)');
               }
             }
           });
@@ -374,6 +390,15 @@ window.sendMessage = async function() {
                       agentMessageBubble = window.appendMessagePlaceholder('agent');
                     }
                     window.updateMessageBubble(agentMessageBubble, part.text);
+                  }
+                  // Live "running" feedback for a plain tool call (not the
+                  // HITL confirmation tool, which has its own pending-card
+                  // flow). It's replaced by the real completed trace when
+                  // selectSession() re-renders the whole log from the
+                  // persisted session further down -- nothing needs to
+                  // remove it here.
+                  if (part.functionCall && part.functionCall.name !== 'adk_request_confirmation') {
+                    window.appendToolCallIndication(part.functionCall.name);
                   }
                 });
               }
@@ -849,6 +874,15 @@ window.sendConfirmation = async function(callId, confirmed) {
                       agentMessageBubble = window.appendMessagePlaceholder('agent');
                     }
                     window.updateMessageBubble(agentMessageBubble, part.text);
+                  }
+                  // Live "running" feedback for a plain tool call (not the
+                  // HITL confirmation tool, which has its own pending-card
+                  // flow). It's replaced by the real completed trace when
+                  // selectSession() re-renders the whole log from the
+                  // persisted session further down -- nothing needs to
+                  // remove it here.
+                  if (part.functionCall && part.functionCall.name !== 'adk_request_confirmation') {
+                    window.appendToolCallIndication(part.functionCall.name);
                   }
                 });
               }
