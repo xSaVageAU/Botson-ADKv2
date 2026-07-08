@@ -36,55 +36,21 @@ func newWebCmd() *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
 	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
 
-	cmd.AddCommand(newWebStartCmd(), newWebStopCmd(), newWebStatusCmd(), newWebDaemonChildCmd())
+	cmd.AddCommand(newWebStartCmd(), newWebStopCmd(), newWebStatusCmd())
 	return cmd
 }
 
-// webDaemonChildArgs builds the argv used to relaunch this executable as the
-// detached __daemon-child process, carrying the same flags the user passed.
+// webDaemonChildArgs builds the argv used to relaunch this executable as a
+// detached background process, carrying the same flags the user passed. It
+// is exactly the plain `web` subcommand a user would type themselves --
+// runWeb registers daemon state regardless of how it was launched (see its
+// doc comment), so there's no separate hidden child command to maintain.
 func webDaemonChildArgs(port int, otelToCloud bool) []string {
 	return []string{
-		"web", "__daemon-child",
+		"web",
 		"--port=" + strconv.Itoa(port),
 		"--otel_to_cloud=" + strconv.FormatBool(otelToCloud),
 	}
-}
-
-// newWebDaemonChildCmd is the hidden entrypoint the detached background
-// process actually runs; users invoke `start`/`stop`/`status` instead.
-func newWebDaemonChildCmd() *cobra.Command {
-	var port int
-	var otelToCloud bool
-
-	cmd := &cobra.Command{
-		Use:    "__daemon-child",
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			daemonCtx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
-
-			ln, ctrlPort, err := daemon.StartControlListener(cancel)
-			if err != nil {
-				return fmt.Errorf("failed to start control listener: %w", err)
-			}
-			defer ln.Close()
-
-			if err := daemon.WriteState(webDaemonName, daemon.State{
-				PID:       os.Getpid(),
-				Port:      ctrlPort,
-				StartedAt: time.Now(),
-				Meta:      map[string]string{"apiPort": strconv.Itoa(port)},
-			}); err != nil {
-				return fmt.Errorf("failed to write daemon state: %w", err)
-			}
-			defer daemon.RemoveState(webDaemonName)
-
-			return runWeb(daemonCtx, port, otelToCloud)
-		},
-	}
-	cmd.Flags().IntVar(&port, "port", 8080, "Port to run the unified server on")
-	cmd.Flags().BoolVar(&otelToCloud, "otel_to_cloud", false, "Enables OpenTelemetry export to Google Cloud")
-	return cmd
 }
 
 func newWebStartCmd() *cobra.Command {
@@ -151,7 +117,48 @@ func newWebStatusCmd() *cobra.Command {
 	}
 }
 
+// runWeb starts Botson's unified core and registers it in the shared
+// daemon-state/control-channel system (core/daemon) so `botson web
+// status/stop` -- and other clients looking for a core to attach to, like
+// `botson tui` -- can find and manage it. This happens no matter how the
+// process was launched: directly (`botson web`), detached (`web start`),
+// bare `botson` defaulting to web, or under an external supervisor like
+// systemd (a plain `ExecStart=botson web` unit works fine here -- systemd
+// doesn't need this process to self-detach).
+//
+// Use runCoreServer directly instead of this for a private, unregistered
+// core -- that's what cmd_tui.go's startEmbeddedCore does, since a TUI's
+// own auto-started fallback core must NOT be discoverable/stoppable this
+// way (see ensureCoreRunning).
 func runWeb(ctx context.Context, port int, otelToCloud bool) error {
+	daemonCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ln, ctrlPort, err := daemon.StartControlListener(cancel)
+	if err != nil {
+		return fmt.Errorf("failed to start control listener: %w", err)
+	}
+	defer ln.Close()
+
+	if err := daemon.WriteState(webDaemonName, daemon.State{
+		PID:       os.Getpid(),
+		Port:      ctrlPort,
+		StartedAt: time.Now(),
+		Meta:      map[string]string{"apiPort": strconv.Itoa(port)},
+	}); err != nil {
+		return fmt.Errorf("failed to write daemon state: %w", err)
+	}
+	defer daemon.RemoveState(webDaemonName)
+
+	return runCoreServer(daemonCtx, port, otelToCloud, false)
+}
+
+// runCoreServer is the actual core -- REST/A2A APIs, the web console, and
+// Discord-toggle wiring -- with no daemon-state registration of its own.
+// quiet suppresses the startup banner, for the embedded-in-TUI case where
+// it would otherwise print stray output just before the TUI's alt-screen
+// takes over the terminal.
+func runCoreServer(ctx context.Context, port int, otelToCloud bool, quiet bool) error {
 	// Register this process as Botson's core so the Discord gateway can be
 	// started/stopped in-process (core/interface/discord/singleton.go)
 	// instead of as a separate OS process.
@@ -166,7 +173,9 @@ func runWeb(ctx context.Context, port int, otelToCloud bool) error {
 		),
 	)
 
-	fmt.Printf("Starting Botson web server on http://localhost:%d... please do not close this window.\n", port)
+	if !quiet {
+		fmt.Printf("Starting Botson web server on http://localhost:%d... please do not close this window.\n", port)
+	}
 
 	args := []string{
 		"web",
@@ -180,7 +189,7 @@ func runWeb(ctx context.Context, port int, otelToCloud bool) error {
 	if execErr != nil && ctx.Err() == nil {
 		return fmt.Errorf("web server execution failed: %w", execErr)
 	}
-	if ctx.Err() != nil {
+	if ctx.Err() != nil && !quiet {
 		log.Println("Server stopped gracefully via signal.")
 	}
 	return nil
