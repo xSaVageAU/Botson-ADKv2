@@ -3,7 +3,7 @@ module botsonv2
 go 1.26.3
 
 require (
-	github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-00010101000000-000000000000
+	github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260709074103-e2a50d1cc806
 	github.com/glebarez/sqlite v1.11.0
 	github.com/nats-io/nats-server/v2 v2.14.3
 	github.com/nats-io/nats.go v1.52.0
@@ -87,5 +87,3 @@ require (
 	rsc.io/omap v1.2.0 // indirect
 	rsc.io/ordered v1.1.1 // indirect
 )
-
-replace github.com/Savs-Agents/NATS-ADK-Proxy => ../NATS-ADK-PROXY
