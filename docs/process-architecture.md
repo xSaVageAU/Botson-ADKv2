@@ -273,5 +273,6 @@ seem like the more likely next places this design gets pushed on.
 ## See also
 
 - [AGENTS.md — "Unified core architecture"](../AGENTS.md) -- the condensed version.
+- [docs/nats-api.md](./nats-api.md) -- the full NATS API reference for building your own consumer against a running core.
 - [docs/sessions.md](./sessions.md) -- how session state/history is actually stored, independent of which process is serving it.
 - [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) -- the imported package fronting the `adk.*` surface.

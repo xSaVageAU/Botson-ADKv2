@@ -115,7 +115,7 @@ Logs: `~/.botsonv2/logs/core.log`. State: `~/.botsonv2/core.pid`. Since Windows 
 
 ### Everything else is a NATS subject, not a CLI command
 
-Settings, custom-agent CRUD, and session/dashboard management are all `botson.*` subjects (`internal/natsapi`) — see that package's `subjects.go` for the full table, or [docs/sessions.md](./docs/sessions.md) for the session-specific ones. Creating/running/inspecting a session mid-conversation, or listing available apps, goes through `adk.*` (the imported NATS-ADK-Proxy) — see that package's README for its wire contract. There is no CLI equivalent for any of this anymore; a raw NATS client (or a short Go scratch script using `nats.go` directly) is the only way to exercise it outside of building a full consumer project.
+Settings, custom-agent CRUD, and session/dashboard management are all `botson.*` subjects (`internal/natsapi`) — see that package's `subjects.go` for the full table, or [docs/sessions.md](./docs/sessions.md) for the session-specific ones. Creating/running/inspecting a session mid-conversation, or listing available apps, goes through `adk.*` (the imported NATS-ADK-Proxy) — see that package's README for its wire contract. There is no CLI equivalent for any of this anymore; a raw NATS client (or a short Go scratch script using `nats.go` directly) is the only way to exercise it outside of building a full consumer project. **See [docs/nats-api.md](./docs/nats-api.md) for the full consumer-facing reference** — every subject, request/reply shape, and a worked example.
 
 ## Configuration reference
 

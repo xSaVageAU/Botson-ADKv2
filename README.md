@@ -42,5 +42,6 @@ Settings live in `~/.botsonv2/config.json` — your Gemini API key, chosen model
 ## Learn more
 
 - **[AGENTS.md](./AGENTS.md)** — architecture, project layout, and the full CLI reference. Start here if you're contributing or maintaining the code (human or AI).
+- **[docs/nats-api.md](./docs/nats-api.md)** — the full NATS API reference for building your own consumer (Discord bot, web UI, anything): every subject, request/reply shape, and a worked example.
 - **[docs/sessions.md](./docs/sessions.md)** — how sessions, state, and history are stored, and the NATS subjects for reading them.
 - **[docs/process-architecture.md](./docs/process-architecture.md)** — how Botson runs as a process: the core, its two NATS subject namespaces, and how a client discovers a running one.
