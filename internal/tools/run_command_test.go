@@ -9,10 +9,10 @@ import (
 )
 
 func TestRunCommand(t *testing.T) {
-	t.Chdir(t.TempDir())
+	root := t.TempDir()
 
 	t.Run("captures stdout and exit code 0", func(t *testing.T) {
-		result, err := runCommand(context.Background(), RunCommandArgs{Command: echoCommand("hello")})
+		result, err := runCommand(context.Background(), root, RunCommandArgs{Command: echoCommand("hello")})
 		if err != nil {
 			t.Fatalf("runCommand failed: %v", err)
 		}
@@ -25,7 +25,7 @@ func TestRunCommand(t *testing.T) {
 	})
 
 	t.Run("captures non-zero exit code without erroring", func(t *testing.T) {
-		result, err := runCommand(context.Background(), RunCommandArgs{Command: exitCommand(3)})
+		result, err := runCommand(context.Background(), root, RunCommandArgs{Command: exitCommand(3)})
 		if err != nil {
 			t.Fatalf("runCommand should report a non-zero exit via ExitCode, not err: %v", err)
 		}
@@ -35,13 +35,13 @@ func TestRunCommand(t *testing.T) {
 	})
 
 	t.Run("rejects an empty command", func(t *testing.T) {
-		if _, err := runCommand(context.Background(), RunCommandArgs{Command: "   "}); err == nil {
+		if _, err := runCommand(context.Background(), root, RunCommandArgs{Command: "   "}); err == nil {
 			t.Fatal("expected an error for an empty command, got none")
 		}
 	})
 
 	t.Run("times out a long-running command", func(t *testing.T) {
-		_, err := runCommand(context.Background(), RunCommandArgs{
+		_, err := runCommand(context.Background(), root, RunCommandArgs{
 			Command:        sleepCommand(5),
 			TimeoutSeconds: 1,
 		})

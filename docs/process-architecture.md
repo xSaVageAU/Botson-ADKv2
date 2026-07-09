@@ -203,10 +203,9 @@ WantedBy=multi-user.target
 systemctl enable --now botson
 botson core status   # confirms it's visible the same way `core start` would leave it
 ```
-`WorkingDirectory` here plays the same role a manually-launched
-`core start`'s caller-cwd does -- it's the workspace every tool call
-(readFile, runCommand, etc.) resolves against for that core's entire
-lifetime (see §7).
+`WorkingDirectory` here no longer has any effect on tool behavior (see
+§7) -- it's kept as a reasonable default cwd for the process itself (logs,
+core files, etc.), not the agent's workspace.
 
 There's currently no bundled systemd unit file or install-time offer to
 set one up -- see §8.
@@ -216,24 +215,23 @@ set one up -- see §8.
 ## 7. Workspace directory resolution
 
 Every tool the agent runs (`readFile`, `writeFile`, `runCommand`, etc.)
-resolves paths relative to *the core process's own working directory* --
-there's no per-session or per-request workspace concept. That directory is
-fixed for the entire lifetime of whichever process is acting as the core:
+resolves paths against a **configured workspace root**, not the core
+process's `os.Getwd()` -- `AppConfig.WorkspaceRoot`
+(`internal/config/config.go`), defaulting to `~/.botson/workspace` and
+settable via `setup install` or the `botson.settings.set` NATS subject
+(`workspaceRoot`, applies immediately, no restart needed). This is
+independent of how or where the core process was launched, unlike the
+launch-time-`os.Getwd()` behavior this replaced.
 
-| How the core was started | Workspace used |
-|---|---|
-| `botson core` (foreground, manual) | Its own `os.Getwd()` at launch |
-| `botson core start` | The *caller's* `os.Getwd()` at the moment `start` was run (explicitly threaded through `daemon.Start`'s `dir` parameter) |
-| Systemd (or similar) | Whatever `WorkingDirectory=` (or equivalent) was configured |
-
-**Known limitation, not solved by any of this**: you cannot change an
-*already-running* core's workspace. It's pinned for that process's life --
-restart it from a different directory (or under a different systemd unit
-/ different `--port` core entirely) to point it elsewhere. True
-per-session or per-tool-call workspace switching would mean threading a
-workspace argument through `agent.Context` and every tool built on
-`os.Getwd()` today -- a materially bigger change than anything in this
-design so far.
+A session can override this default entirely, via `stateDelta` on
+`POST /api/run` (`{"botson:cwd": "/any/absolute/path"}`) -- see
+[docs/nats-api.md §3](./nats-api.md#setting-a-sessions-working-directory).
+That override is **not sandboxed to WorkspaceRoot**; it can point anywhere
+the core process can read/write. This is why the embedded NATS server
+requires a token (§8) -- the token is what gates a consumer's ability to
+point a session's file/command tools at an arbitrary host path, since the
+path itself isn't restricted. The resolution logic lives in
+`internal/tools/workspace.go` (`effectiveRoot`, `resolveWorkspacePath`).
 
 ---
 
@@ -246,16 +244,14 @@ seem like the more likely next places this design gets pushed on.
   it back -- a systemd unit with `Restart=on-failure` (§6) is currently the
   only way to get that, and it's not offered or documented anywhere except
   this file.
-- **One workspace per core, for its whole life (§7).** If you want to work
-  on two different projects with the agent at once, that's two entirely
-  separate cores (different ports, no shared state) rather than one core
-  juggling both.
-- **Discovery and the NATS server are single-host and unauthenticated.**
-  Everything is `127.0.0.1`-only by convention, not by enforcement --
-  there's no bind-address restriction, auth token, or TLS on the embedded
-  NATS server. Fine for a local dev tool; would need real work before
-  "point a client at a core running somewhere else" becomes a supported
-  idea.
+- **Discovery and the NATS server are single-host.** Everything is
+  `127.0.0.1`-only by convention, not by enforcement -- there's no
+  bind-address restriction or TLS on the embedded NATS server (it does now
+  require a token, §7/`docs/nats-api.md` §1, generated into
+  `~/.botson/config.json`). Fine for a local dev tool; would need real
+  work (bind-address enforcement, TLS) before "point a client at a core
+  running somewhere else, over a network you don't fully trust" becomes a
+  supported idea.
 - **`adk.*` doesn't stream yet.** NATS-ADK-Proxy's REST passthrough for
   `run` is currently request/reply only (`run_sse`/A2A `message/stream`
   aren't implemented upstream in that package yet) -- a caller gets the

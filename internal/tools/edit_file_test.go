@@ -9,7 +9,9 @@ import (
 
 func TestEditFile(t *testing.T) {
 	root := t.TempDir()
-	t.Chdir(root)
+	old := WorkspaceRoot
+	WorkspaceRoot = root
+	t.Cleanup(func() { WorkspaceRoot = old })
 
 	writeAndRead := func(t *testing.T, ctx *fakeContext, path, content string) {
 		t.Helper()

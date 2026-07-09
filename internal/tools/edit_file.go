@@ -36,7 +36,7 @@ func EditFile(ctx agent.Context, args EditFileArgs) (EditFileResult, error) {
 		return EditFileResult{}, fmt.Errorf("oldString and newString are identical; nothing to edit")
 	}
 
-	fullPath, err := resolveWorkspacePath(args.FilePath)
+	fullPath, err := resolveWorkspacePath(ctx, args.FilePath)
 	if err != nil {
 		return EditFileResult{}, err
 	}

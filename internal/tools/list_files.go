@@ -3,8 +3,6 @@ package tools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"google.golang.org/adk/v2/agent"
 )
@@ -22,18 +20,13 @@ type InspectWorkspaceResult struct {
 
 // ListFiles allows the agent to check the local project files to help the developer.
 func ListFiles(ctx agent.Context, args InspectWorkspaceArgs) (InspectWorkspaceResult, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return InspectWorkspaceResult{}, fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	targetDir := root
+	targetDir := effectiveRoot(ctx)
 	if args.Subdir != "" {
-		cleanedSub := filepath.Clean(args.Subdir)
-		if strings.HasPrefix(cleanedSub, "..") || filepath.IsAbs(cleanedSub) {
-			return InspectWorkspaceResult{}, fmt.Errorf("access denied: path must be inside project workspace")
+		resolved, err := resolveWorkspacePath(ctx, args.Subdir)
+		if err != nil {
+			return InspectWorkspaceResult{}, err
 		}
-		targetDir = filepath.Join(root, cleanedSub)
+		targetDir = resolved
 	}
 
 	entries, err := os.ReadDir(targetDir)

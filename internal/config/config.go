@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +15,22 @@ type AppConfig struct {
 	ModelName    string `json:"model_name"`
 	GeminiAPIKey string `json:"gemini_api_key"`
 	RootAgent    string `json:"root_agent"`
+
+	// WorkspaceRoot is the default directory the file/command tools
+	// (listFiles, readFile, writeFile, editFile, runCommand) operate in
+	// when a session hasn't set its own "botson:cwd" state override --
+	// see internal/tools/workspace.go. Defaults to ~/.botson/workspace.
+	WorkspaceRoot string `json:"workspace_root"`
+
+	// NatsAuthToken gates the embedded NATS server -- required on every
+	// connection once set (see cmd/botson-core/cmd_core.go). Generated
+	// once and never exposed via Mask()/botson.settings.get, since it's
+	// the credential that gates the very API that subject lives on.
+	// omitempty so Mask()'s blanked copy drops the key entirely from a
+	// botson.settings.get reply rather than showing an empty placeholder
+	// -- on disk it's never actually empty once generated, so this has no
+	// effect on the real config.json.
+	NatsAuthToken string `json:"nats_auth_token,omitempty"`
 }
 
 // MaskedSecret is the placeholder Mask substitutes for secret fields, and
@@ -29,7 +47,17 @@ func Mask(cfg *AppConfig) AppConfig {
 	if masked.GeminiAPIKey != "" {
 		masked.GeminiAPIKey = MaskedSecret
 	}
+	masked.NatsAuthToken = ""
 	return masked
+}
+
+// generateToken returns a random hex token used as NatsAuthToken.
+func generateToken() (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate NATS auth token: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // GetConfigPath returns the absolute path to ~/.botson/config.json
@@ -82,6 +110,9 @@ func loadLocked() (*AppConfig, error) {
 				ModelName: "gemini-3.1-flash-lite",
 				RootAgent: "Agent Botson",
 			}
+			if _, err := fillWorkspaceAndToken(defaultCfg); err != nil {
+				return nil, err
+			}
 			// Bootstrap the config file so it physically exists
 			if err := saveLocked(defaultCfg); err != nil {
 				return nil, err
@@ -98,6 +129,22 @@ func loadLocked() (*AppConfig, error) {
 
 	if cfg.ModelName == "" {
 		cfg.ModelName = "gemini-3.1-flash-lite"
+	}
+
+	// Unlike ModelName above, WorkspaceRoot/NatsAuthToken must be persisted
+	// to disk immediately once backfilled, not just fixed up in memory --
+	// NatsAuthToken in particular is read directly off disk by other
+	// processes (e.g. Botson-TUI pairing with a local core), so a value
+	// that only exists in this process until some unrelated Save/Update
+	// call is not good enough.
+	dirty, err := fillWorkspaceAndToken(&cfg)
+	if err != nil {
+		return nil, err
+	}
+	if dirty {
+		if err := saveLocked(&cfg); err != nil {
+			return nil, err
+		}
 	}
 
 	cached = &cfg
@@ -165,4 +212,29 @@ func GetDataDir() (string, error) {
 		return "", fmt.Errorf("failed to create data directory: %w", err)
 	}
 	return dataDir, nil
+}
+
+// fillWorkspaceAndToken backfills WorkspaceRoot and NatsAuthToken on cfg if
+// either is empty, reporting whether it changed anything so the caller
+// knows to persist the result.
+func fillWorkspaceAndToken(cfg *AppConfig) (dirty bool, err error) {
+	if cfg.WorkspaceRoot == "" {
+		dataDir, err := GetDataDir()
+		if err != nil {
+			return false, err
+		}
+		cfg.WorkspaceRoot = filepath.Join(dataDir, "workspace")
+		dirty = true
+	}
+
+	if cfg.NatsAuthToken == "" {
+		token, err := generateToken()
+		if err != nil {
+			return false, err
+		}
+		cfg.NatsAuthToken = token
+		dirty = true
+	}
+
+	return dirty, nil
 }

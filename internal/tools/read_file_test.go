@@ -10,7 +10,9 @@ import (
 
 func TestReadFile(t *testing.T) {
 	root := t.TempDir()
-	t.Chdir(root)
+	old := WorkspaceRoot
+	WorkspaceRoot = root
+	t.Cleanup(func() { WorkspaceRoot = old })
 
 	var lines []string
 	for i := 1; i <= 10; i++ {

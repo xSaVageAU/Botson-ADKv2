@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -30,22 +29,18 @@ type RunCommandResult struct {
 // RunCommand lets the agent execute an arbitrary shell command in the
 // project workspace -- builds, tests, git, and anything else a CLI could
 // do. Runs via the platform's own shell so pipes/redirects/&& work exactly
-// as the agent would expect from writing a normal command line. Delegates
-// to runCommand, which takes a plain context.Context (agent.Context
-// satisfies it via embedding) so the actual exec logic is unit-testable
-// without an ADK mock.
+// as the agent would expect from writing a normal command line. Resolves
+// the effective root here (needs agent.Context for session state) and
+// delegates to runCommand, which takes a plain context.Context (agent.Context
+// satisfies it via embedding) plus that resolved root, so the actual exec
+// logic stays unit-testable without an ADK mock.
 func RunCommand(ctx agent.Context, args RunCommandArgs) (RunCommandResult, error) {
-	return runCommand(ctx, args)
+	return runCommand(ctx, effectiveRoot(ctx), args)
 }
 
-func runCommand(ctx context.Context, args RunCommandArgs) (RunCommandResult, error) {
+func runCommand(ctx context.Context, root string, args RunCommandArgs) (RunCommandResult, error) {
 	if strings.TrimSpace(args.Command) == "" {
 		return RunCommandResult{}, fmt.Errorf("command must not be empty")
-	}
-
-	root, err := os.Getwd()
-	if err != nil {
-		return RunCommandResult{}, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	shell, shellFlag := "/bin/sh", "-c"

@@ -29,10 +29,25 @@ In the common case (you're running your own core alongside your consumer,
 or you know the port because you configured it) you can skip this and just
 hardcode the port you started it with.
 
-There is no NATS-level authentication by default — the embedded server
-binds to `127.0.0.1` by convention, not enforcement. See
+The embedded server requires a token on every connection — `setup install`
+generates one the first time a core runs and stores it in
+`~/.botson/config.json`'s `nats_auth_token` field. Read it from there and
+pass it when connecting:
+
+```go
+nc, _ := nats.Connect("nats://127.0.0.1:4222", nats.Token(token))
+```
+
+If your consumer runs on the same machine as the core, this is the only
+file you need to read to pair with zero configuration -- Botson-TUI does
+exactly this. For a remote core, the token has to reach you out of band
+(the operator copies it from their own `~/.botson/config.json`, or from
+`setup install`'s output when the core was first configured); there's no
+way to fetch it over NATS itself, since it's the credential gating that
+very connection. See
 [process-architecture.md §8](./process-architecture.md#8-limitations-and-directions-worth-thinking-about)
-if you need real auth/remote access; it isn't built yet.
+for what this auth model does and doesn't cover (still no TLS, still binds
+to `127.0.0.1` by convention rather than enforcement).
 
 Once connected, everything below is either a **request/reply** call
 (`nats.Request`/`RequestMsg` — publish, get exactly one reply) or, for a
@@ -164,6 +179,34 @@ for the exact event sequence and the trap to avoid (a call ID gets two
 different `functionResponse`s over its lifetime — don't key off "last seen"
 alone).
 
+### Setting a session's working directory
+
+The file/command tools (`listFiles`, `readFile`, `writeFile`, `editFile`,
+`runCommand`) default to the core's configured workspace
+(`workspace_root` in settings, below). A session can override this by
+sending upstream ADK's own `stateDelta` field on a `POST /api/run`
+request — it's not part of Botson's own wire format, just a real,
+already-functional field on the request body NATS-ADK-Proxy forwards
+byte-for-byte:
+
+```json
+{
+  "appName": "Agent Botson",
+  "userId": "your-consumer:some-id",
+  "sessionId": "abc-1",
+  "newMessage": { "role": "user", "parts": [{ "text": "hello" }] },
+  "stateDelta": { "botson:cwd": "/path/to/a/project" }
+}
+```
+
+Once set, every tool call in that session uses `/path/to/a/project`
+instead of the default workspace, for the rest of the session's life (no
+need to resend it on later turns). It's typically sent once, on a
+session's first turn. **This path is not sandboxed** — it can be anywhere
+the core process can read/write, which is why the embedded NATS server
+requires a token (§1): only a holder of that token can point a session's
+tools at an arbitrary host path.
+
 ---
 
 ## 4. `botson.*` — managing the Botson instance
@@ -178,8 +221,8 @@ using the rest of the reply.
 
 | Subject | Request | Reply |
 |---|---|---|
-| `botson.settings.get` | *(empty)* | `{"model_name","gemini_api_key","root_agent"}` — `gemini_api_key` is always masked (`"******"`) |
-| `botson.settings.set` | `{"modelName"?, "rootAgent"?, "geminiApiKey"?}` — omit a field to leave it unchanged | same shape as `settings.get`, reflecting the new values |
+| `botson.settings.get` | *(empty)* | `{"model_name","gemini_api_key","root_agent","workspace_root"}` — `gemini_api_key` is always masked (`"******"`); `nats_auth_token` is never included here at all |
+| `botson.settings.set` | `{"modelName"?, "rootAgent"?, "geminiApiKey"?, "workspaceRoot"?}` — omit a field to leave it unchanged | same shape as `settings.get`, reflecting the new values. A `workspaceRoot` change applies immediately, no restart needed |
 
 ### Agents
 

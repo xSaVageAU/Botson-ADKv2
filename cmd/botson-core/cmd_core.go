@@ -153,7 +153,12 @@ func runCore(ctx context.Context, port int) error {
 // until ctx is done (or either namespace's server exits unexpectedly),
 // then shuts everything down.
 func runCoreServer(ctx context.Context, port int, quiet bool) error {
-	srv, err := server.NewServer(&server.Options{Host: "127.0.0.1", Port: port, NoLog: quiet})
+	srv, err := server.NewServer(&server.Options{
+		Host:          "127.0.0.1",
+		Port:          port,
+		NoLog:         quiet,
+		Authorization: boot.Config.NatsAuthToken,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to configure the embedded NATS server: %w", err)
 	}
@@ -163,14 +168,17 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 	}
 	defer srv.Shutdown()
 
-	nc, err := nats.Connect(srv.ClientURL())
+	// The server's own Authorization token (above) gates every connection,
+	// including this in-process one -- without passing it here, the core's
+	// own adkproxy/natsapi wiring would be rejected by its own server.
+	nc, err := nats.Connect(srv.ClientURL(), nats.Token(boot.Config.NatsAuthToken))
 	if err != nil {
 		return fmt.Errorf("failed to connect to the embedded NATS server: %w", err)
 	}
 	defer nc.Close()
 
 	if !quiet {
-		fmt.Printf("Starting Botson's core on nats://127.0.0.1:%d... please do not close this window.\n", port)
+		fmt.Printf("Starting Botson's core on nats://127.0.0.1:%d (token-authenticated)... please do not close this window.\n", port)
 	}
 
 	proxy, err := adkproxy.New(adkproxy.Config{

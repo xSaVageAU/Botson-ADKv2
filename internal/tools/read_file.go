@@ -35,7 +35,7 @@ type ReadFileResult struct {
 // read-before-write guard -- a single ReadFile call anywhere in the file
 // is enough to unlock editing it, not a full-file read.
 func ReadFile(ctx agent.Context, args ReadFileArgs) (ReadFileResult, error) {
-	fullPath, err := resolveWorkspacePath(args.FilePath)
+	fullPath, err := resolveWorkspacePath(ctx, args.FilePath)
 	if err != nil {
 		return ReadFileResult{}, err
 	}

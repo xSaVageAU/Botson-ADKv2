@@ -9,7 +9,9 @@ import (
 
 func TestWriteFile(t *testing.T) {
 	root := t.TempDir()
-	t.Chdir(root)
+	old := WorkspaceRoot
+	WorkspaceRoot = root
+	t.Cleanup(func() { WorkspaceRoot = old })
 
 	result, err := WriteFile(nil, WriteFileArgs{
 		FilePath: "nested/dir/hello.txt",
@@ -50,7 +52,9 @@ func TestWriteFile(t *testing.T) {
 // these cases need something that actually backs State().
 func TestWriteFileReadBeforeWriteGuard(t *testing.T) {
 	root := t.TempDir()
-	t.Chdir(root)
+	old := WorkspaceRoot
+	WorkspaceRoot = root
+	t.Cleanup(func() { WorkspaceRoot = old })
 	ctx := newFakeContext()
 
 	// A brand-new file needs no prior read.

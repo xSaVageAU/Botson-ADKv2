@@ -73,6 +73,12 @@ func Install(ctx context.Context, opts InstallOptions) error {
 	fmt.Println("Setup complete! Run `botson core start` to bring the core online, then")
 	fmt.Println("talk to it over NATS -- see internal/natsapi/subjects.go and")
 	fmt.Println("NATS-ADK-Proxy's README for the full subject list.")
+	fmt.Println()
+	fmt.Println("Workspace:      ", cfg.WorkspaceRoot)
+	fmt.Println("NATS auth token:", cfg.NatsAuthToken)
+	fmt.Println("A consumer on this machine (e.g. Botson-TUI) can read the token")
+	fmt.Println("straight from ~/.botson/config.json to pair automatically; a remote")
+	fmt.Println("consumer needs it copied over out of band.")
 	return nil
 }
 

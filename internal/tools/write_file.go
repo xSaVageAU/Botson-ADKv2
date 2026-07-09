@@ -25,7 +25,7 @@ type WriteFileResult struct {
 // make changes, rather than only saving to the separate, session-scoped
 // artifact store SaveArtifact writes to.
 func WriteFile(ctx agent.Context, args WriteFileArgs) (WriteFileResult, error) {
-	fullPath, err := resolveWorkspacePath(args.FilePath)
+	fullPath, err := resolveWorkspacePath(ctx, args.FilePath)
 	if err != nil {
 		return WriteFileResult{}, err
 	}

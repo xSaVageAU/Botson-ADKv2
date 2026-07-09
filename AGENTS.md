@@ -124,9 +124,23 @@ Settings, custom-agent CRUD, and session/dashboard management are all `botson.*`
 {
   "model_name": "gemini-3.1-flash-lite",
   "gemini_api_key": "your_api_key_here",
-  "root_agent": "Agent Botson"
+  "root_agent": "Agent Botson",
+  "workspace_root": "/home/you/.botson/workspace",
+  "nats_auth_token": "a generated hex token"
 }
 ```
+`workspace_root` and `nats_auth_token` are generated automatically the
+first time the config is loaded if either is missing (see
+`fillWorkspaceAndToken` in `internal/config/config.go`) -- there's nothing
+to set by hand on a fresh install. `nats_auth_token` gates every
+connection to the embedded NATS server (`cmd/botson-core/cmd_core.go`) and
+is deliberately never exposed through `botson.settings.get`/`Mask()` —
+it's the credential gating that very API. `workspace_root` is the default
+directory the file/command tools operate in (`internal/tools/workspace.go`);
+a session can override it per-session via `stateDelta` on `/api/run` (see
+[docs/nats-api.md](./docs/nats-api.md#setting-a-sessions-working-directory)),
+to any absolute path — not sandboxed, unlike `workspace_root` itself.
+
 Read/write this file through `botson setup install`, the `botson.settings.set` NATS subject, or the `updateSettings` tool rather than hand-editing while a `botson core` process is running, so the in-memory copy that process is holding doesn't drift from disk — see "Self-configuration" above.
 
 ## Dependencies

@@ -8,7 +8,10 @@ import (
 
 func TestResolveWorkspacePath(t *testing.T) {
 	root := t.TempDir()
-	t.Chdir(root)
+	old := WorkspaceRoot
+	WorkspaceRoot = root
+	t.Cleanup(func() { WorkspaceRoot = old })
+	ctx := newFakeContext()
 
 	if err := os.WriteFile(filepath.Join(root, "in-root.txt"), []byte("x"), 0644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -42,7 +45,7 @@ func TestResolveWorkspacePath(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := resolveWorkspacePath(c.path)
+			_, err := resolveWorkspacePath(ctx, c.path)
 			if c.wantErr && err == nil {
 				t.Fatalf("expected an error for %q, got none", c.path)
 			}

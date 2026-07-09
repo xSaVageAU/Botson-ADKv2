@@ -11,6 +11,7 @@ import (
 	"botson/internal/agent"
 	"botson/internal/config"
 	"botson/internal/management"
+	"botson/internal/tools"
 )
 
 // Serve subscribes to every subject in this package, answering requests
@@ -105,11 +106,18 @@ func handleSettingsSet() nats.MsgHandler {
 			if req.GeminiAPIKey != nil {
 				cfg.GeminiAPIKey = *req.GeminiAPIKey
 			}
+			if req.WorkspaceRoot != nil {
+				cfg.WorkspaceRoot = *req.WorkspaceRoot
+			}
 		})
 		if err != nil {
 			respondError(msg, err)
 			return
 		}
+		// Apply a live WorkspaceRoot change immediately -- tools.WorkspaceRoot
+		// is a package-level var set once at boot, so without this a running
+		// core wouldn't pick up the change until restarted.
+		tools.SetWorkspaceRoot(cfg.WorkspaceRoot)
 
 		respond(msg, config.Mask(cfg))
 	}

@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"botson/internal/agent"
 	coreartifact "botson/internal/artifact"
 	"botson/internal/config"
 	coresession "botson/internal/session"
+	"botson/internal/tools"
 
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/model/gemini"
@@ -30,6 +32,11 @@ func setupApp(ctx context.Context) (*appBoot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuration error: %w", err)
 	}
+
+	if err := os.MkdirAll(appConfig.WorkspaceRoot, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+	tools.SetWorkspaceRoot(appConfig.WorkspaceRoot)
 
 	model, err := gemini.NewModel(ctx, appConfig.ModelName, &genai.ClientConfig{
 		APIKey: appConfig.GeminiAPIKey,

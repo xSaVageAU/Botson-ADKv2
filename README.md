@@ -35,9 +35,11 @@ botson core start   # or `botson core` to run in the foreground
 ```
 From here, talk to it over NATS — see `internal/natsapi/subjects.go` for the `botson.*` subject table and [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy)'s README for the `adk.*` surface. `botson --help` lists the CLI's two subcommands (`core`, `setup`); there is no third.
 
+Every connection needs the NATS auth token `setup install` just generated and printed — it's also in `~/.botson/config.json`'s `nats_auth_token` field. A consumer on the same machine (e.g. [Botson-TUI](https://github.com/Savs-Agents/Botson-TUI)) can read that file directly and pair with zero configuration; a remote consumer needs the token copied over separately.
+
 ## Configuration
 
-Settings live in `~/.botson/config.json` — your Gemini API key, chosen model, and root agent. Change it via `setup install`, the `botson.settings.set` NATS subject, or (for everything but the API key) the agent's own `updateSettings` tool.
+Settings live in `~/.botson/config.json` — your Gemini API key, chosen model, root agent, workspace directory, and NATS auth token. Change it via `setup install`, the `botson.settings.set` NATS subject (everything but the API key and the auth token), or the agent's own `updateSettings` tool. The file/command tools default to `workspace_root` (`~/.botson/workspace` unless changed); a session can point them at a different, unsandboxed absolute path instead via `stateDelta` on `/api/run` — see [docs/nats-api.md](./docs/nats-api.md#setting-a-sessions-working-directory).
 
 ## Learn more
 
