@@ -8,12 +8,11 @@ import (
 	"botson/internal/agent"
 	coreartifact "botson/internal/artifact"
 	"botson/internal/config"
+	"botson/internal/providers"
 	coresession "botson/internal/session"
 	"botson/internal/tools"
 
 	"google.golang.org/adk/v2/cmd/launcher"
-	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/genai"
 )
 
 // appBoot bundles the shared services every subcommand needs: the loaded
@@ -38,11 +37,9 @@ func setupApp(ctx context.Context) (*appBoot, error) {
 	}
 	tools.SetWorkspaceRoot(appConfig.WorkspaceRoot)
 
-	model, err := gemini.NewModel(ctx, appConfig.ModelName, &genai.ClientConfig{
-		APIKey: appConfig.GeminiAPIKey,
-	})
+	model, err := providers.New(ctx, appConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini model: %w", err)
+		return nil, fmt.Errorf("failed to create model: %w", err)
 	}
 
 	loader, err := agent.LoadDefaultAgents(model)

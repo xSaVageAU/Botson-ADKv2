@@ -16,6 +16,15 @@ type AppConfig struct {
 	GeminiAPIKey string `json:"gemini_api_key"`
 	RootAgent    string `json:"root_agent"`
 
+	// Provider selects which internal/providers backend builds the model.LLM
+	// at boot: "gemini" (default) or "openrouter". ModelName is interpreted
+	// differently depending on this: a bare Gemini model name for "gemini",
+	// or a full OpenRouter model slug (e.g. "anthropic/claude-3.5-sonnet")
+	// for "openrouter".
+	Provider string `json:"provider"`
+	// OpenRouterAPIKey is required when Provider == "openrouter".
+	OpenRouterAPIKey string `json:"openrouter_api_key"`
+
 	// WorkspaceRoot is the default directory the file/command tools
 	// (listFiles, readFile, writeFile, editFile, runCommand) operate in
 	// when a session hasn't set its own "botson:cwd" state override --
@@ -46,6 +55,9 @@ func Mask(cfg *AppConfig) AppConfig {
 	masked := *cfg
 	if masked.GeminiAPIKey != "" {
 		masked.GeminiAPIKey = MaskedSecret
+	}
+	if masked.OpenRouterAPIKey != "" {
+		masked.OpenRouterAPIKey = MaskedSecret
 	}
 	masked.NatsAuthToken = ""
 	return masked
@@ -109,6 +121,7 @@ func loadLocked() (*AppConfig, error) {
 			defaultCfg := &AppConfig{
 				ModelName: "gemini-3.1-flash-lite",
 				RootAgent: "Agent Botson",
+				Provider:  "gemini",
 			}
 			if _, err := fillWorkspaceAndToken(defaultCfg); err != nil {
 				return nil, err
@@ -129,6 +142,9 @@ func loadLocked() (*AppConfig, error) {
 
 	if cfg.ModelName == "" {
 		cfg.ModelName = "gemini-3.1-flash-lite"
+	}
+	if cfg.Provider == "" {
+		cfg.Provider = "gemini"
 	}
 
 	// Unlike ModelName above, WorkspaceRoot/NatsAuthToken must be persisted

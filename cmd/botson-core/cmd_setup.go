@@ -23,10 +23,12 @@ func newSetupCmd() *cobra.Command {
 
 func newSetupInstallCmd() *cobra.Command {
 	var (
-		nonInteractive bool
-		geminiAPIKey   string
-		modelName      string
-		rootAgent      string
+		nonInteractive   bool
+		geminiAPIKey     string
+		modelName        string
+		rootAgent        string
+		provider         string
+		openRouterAPIKey string
 	)
 
 	cmd := &cobra.Command{
@@ -36,22 +38,28 @@ func newSetupInstallCmd() *cobra.Command {
 			"Pass --non-interactive along with the flags below to drive this from a script " +
 			"or another agent instead of answering prompts. Any flag left unset falls back " +
 			"to whatever's already in the config (or a built-in default on a fresh install) " +
-			"rather than prompting for it.",
+			"rather than prompting for it. To use OpenRouter instead of Gemini, pass " +
+			"--provider openrouter --openrouter-api-key <key> --model <openrouter model slug> " +
+			"(the interactive wizard only covers Gemini today).",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := setup.InstallOptions{
-				NonInteractive: nonInteractive,
-				GeminiAPIKey:   geminiAPIKey,
-				ModelName:      modelName,
-				RootAgent:      rootAgent,
+				NonInteractive:   nonInteractive,
+				GeminiAPIKey:     geminiAPIKey,
+				ModelName:        modelName,
+				RootAgent:        rootAgent,
+				Provider:         provider,
+				OpenRouterAPIKey: openRouterAPIKey,
 			}
 			return setup.Install(cmd.Context(), opts)
 		},
 	}
 
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Skip all prompts; use the flags below instead of asking")
-	cmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Gemini API key (required on a first install if --non-interactive)")
-	cmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (default: gemini-3.1-flash-lite)")
+	cmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Gemini API key (required on a first install with provider gemini if --non-interactive)")
+	cmd.Flags().StringVar(&modelName, "model", "", "Model name: a bare Gemini model name, or a full OpenRouter model slug when --provider openrouter (default: gemini-3.1-flash-lite)")
 	cmd.Flags().StringVar(&rootAgent, "root-agent", "", "Root agent name (default: Agent Botson)")
+	cmd.Flags().StringVar(&provider, "provider", "", "LLM backend: 'gemini' (default) or 'openrouter'")
+	cmd.Flags().StringVar(&openRouterAPIKey, "openrouter-api-key", "", "OpenRouter API key (required on a first install with provider openrouter if --non-interactive)")
 
 	return cmd
 }

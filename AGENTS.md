@@ -124,11 +124,21 @@ Settings, custom-agent CRUD, and session/dashboard management are all `botson.*`
 {
   "model_name": "gemini-3.1-flash-lite",
   "gemini_api_key": "your_api_key_here",
+  "provider": "gemini",
+  "openrouter_api_key": "",
   "root_agent": "Agent Botson",
   "workspace_root": "/home/you/.botson/workspace",
   "nats_auth_token": "a generated hex token"
 }
 ```
+`provider` selects which `internal/providers` backend builds the model at
+boot: `"gemini"` (default) or `"openrouter"`. `model_name` is interpreted
+accordingly -- a bare Gemini model name, or a full OpenRouter model slug
+(e.g. `"anthropic/claude-3.5-sonnet"`) when `provider` is `"openrouter"`,
+in which case `openrouter_api_key` is required instead of (or alongside)
+`gemini_api_key`. Like `model_name`/`root_agent`, changing `provider`
+takes effect on the next core restart, not live.
+
 `workspace_root` and `nats_auth_token` are generated automatically the
 first time the config is loaded if either is missing (see
 `fillWorkspaceAndToken` in `internal/config/config.go`) -- there's nothing

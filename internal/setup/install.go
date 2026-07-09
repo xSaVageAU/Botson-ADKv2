@@ -28,6 +28,9 @@ type InstallOptions struct {
 	GeminiAPIKey string
 	ModelName    string
 	RootAgent    string
+
+	Provider         string
+	OpenRouterAPIKey string
 }
 
 // Install writes ~/.botson/config.json: Gemini API key, then root agent.
@@ -89,8 +92,24 @@ func applyInstallOptions(cfg *config.AppConfig, opts InstallOptions) error {
 	if opts.GeminiAPIKey != "" {
 		cfg.GeminiAPIKey = opts.GeminiAPIKey
 	}
-	if cfg.GeminiAPIKey == "" {
-		return fmt.Errorf("gemini API key required: pass --gemini-api-key (no existing configuration to fall back on)")
+	if opts.OpenRouterAPIKey != "" {
+		cfg.OpenRouterAPIKey = opts.OpenRouterAPIKey
+	}
+	if opts.Provider != "" {
+		cfg.Provider = opts.Provider
+	} else if cfg.Provider == "" {
+		cfg.Provider = "gemini"
+	}
+
+	switch cfg.Provider {
+	case "openrouter":
+		if cfg.OpenRouterAPIKey == "" {
+			return fmt.Errorf("openrouter API key required: pass --openrouter-api-key (no existing configuration to fall back on)")
+		}
+	default:
+		if cfg.GeminiAPIKey == "" {
+			return fmt.Errorf("gemini API key required: pass --gemini-api-key (no existing configuration to fall back on)")
+		}
 	}
 
 	if opts.ModelName != "" {

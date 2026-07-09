@@ -109,6 +109,12 @@ func handleSettingsSet() nats.MsgHandler {
 			if req.WorkspaceRoot != nil {
 				cfg.WorkspaceRoot = *req.WorkspaceRoot
 			}
+			if req.Provider != nil {
+				cfg.Provider = *req.Provider
+			}
+			if req.OpenRouterAPIKey != nil {
+				cfg.OpenRouterAPIKey = *req.OpenRouterAPIKey
+			}
 		})
 		if err != nil {
 			respondError(msg, err)

@@ -221,8 +221,8 @@ using the rest of the reply.
 
 | Subject | Request | Reply |
 |---|---|---|
-| `botson.settings.get` | *(empty)* | `{"model_name","gemini_api_key","root_agent","workspace_root"}` — `gemini_api_key` is always masked (`"******"`); `nats_auth_token` is never included here at all |
-| `botson.settings.set` | `{"modelName"?, "rootAgent"?, "geminiApiKey"?, "workspaceRoot"?}` — omit a field to leave it unchanged | same shape as `settings.get`, reflecting the new values. A `workspaceRoot` change applies immediately, no restart needed |
+| `botson.settings.get` | *(empty)* | `{"model_name","gemini_api_key","root_agent","workspace_root","provider","openrouter_api_key"}` — `gemini_api_key`/`openrouter_api_key` are always masked (`"******"`); `nats_auth_token` is never included here at all |
+| `botson.settings.set` | `{"modelName"?, "rootAgent"?, "geminiApiKey"?, "workspaceRoot"?, "provider"?, "openRouterApiKey"?}` — omit a field to leave it unchanged | same shape as `settings.get`, reflecting the new values. A `workspaceRoot` change applies immediately, no restart needed; `modelName`/`provider`/the API keys take effect on the next core restart |
 
 ### Agents
 

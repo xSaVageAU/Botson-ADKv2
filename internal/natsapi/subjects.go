@@ -30,10 +30,12 @@ const (
 // `settings set`'s old "only touch the flags you actually pass" semantics
 // (cmd.Flags().Changed) now expressed on the wire as optional pointers.
 type SettingsSetRequest struct {
-	ModelName     *string `json:"modelName,omitempty"`
-	RootAgent     *string `json:"rootAgent,omitempty"`
-	GeminiAPIKey  *string `json:"geminiApiKey,omitempty"`
-	WorkspaceRoot *string `json:"workspaceRoot,omitempty"`
+	ModelName        *string `json:"modelName,omitempty"`
+	RootAgent        *string `json:"rootAgent,omitempty"`
+	GeminiAPIKey     *string `json:"geminiApiKey,omitempty"`
+	WorkspaceRoot    *string `json:"workspaceRoot,omitempty"`
+	Provider         *string `json:"provider,omitempty"`
+	OpenRouterAPIKey *string `json:"openRouterApiKey,omitempty"`
 }
 
 // AgentsSaveRequest is the request payload for SubjectAgentsSave.

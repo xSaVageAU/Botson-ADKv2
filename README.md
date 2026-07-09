@@ -41,6 +41,8 @@ Every connection needs the NATS auth token `setup install` just generated and pr
 
 Settings live in `~/.botson/config.json` — your Gemini API key, chosen model, root agent, workspace directory, and NATS auth token. Change it via `setup install`, the `botson.settings.set` NATS subject (everything but the API key and the auth token), or the agent's own `updateSettings` tool. The file/command tools default to `workspace_root` (`~/.botson/workspace` unless changed); a session can point them at a different, unsandboxed absolute path instead via `stateDelta` on `/api/run` — see [docs/nats-api.md](./docs/nats-api.md#setting-a-sessions-working-directory).
 
+By default Botson talks to Gemini. To use a model served through [OpenRouter](https://openrouter.ai) instead, set `provider` to `"openrouter"` and `openrouter_api_key` to your key (e.g. `botson setup install --non-interactive --provider openrouter --openrouter-api-key <key> --model anthropic/claude-3.5-sonnet`) — `model_name` then needs to be the full OpenRouter model slug, not a bare Gemini model name. A `provider` change takes effect on the next `botson core` restart.
+
 ## Learn more
 
 - **[AGENTS.md](./AGENTS.md)** — architecture, project layout, and the full CLI reference. Start here if you're contributing or maintaining the code (human or AI).
