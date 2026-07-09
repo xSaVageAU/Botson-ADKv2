@@ -29,14 +29,21 @@ func newTUICmd() *cobra.Command {
 		Short:             "Start an interactive terminal chat session (default when no command is given)",
 		PersistentPreRunE: noBootstrap,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTUI(cmd.Context(), agentFlag)
+			return runTUI(cmd.Context(), agentFlag, resumeSessionFlag, resumeUserFlag)
 		},
 	}
 	cmd.Flags().BoolVar(&noAutoStartCore, "no-auto-start", false, "Fail instead of running a private, in-process core if Botson's shared core isn't already running")
 	return cmd
 }
 
-func runTUI(ctx context.Context, agentName string) error {
+// runTUI starts a new chat session, or -- if resumeSessionID is set --
+// reattaches to an existing one instead: a brand-new session always runs
+// under the fixed user "tui", but resuming needs whatever user ID the
+// session actually belongs to (resumeUserID, "tui" by default -- see
+// resumeUserFlag), since other interfaces use their own (the web console
+// always uses "web"). The session's prior turns are replayed into the
+// transcript so the conversation reads as if it never stopped.
+func runTUI(ctx context.Context, agentName, resumeSessionID, resumeUserID string) error {
 	apiPort, err := ensureCoreRunning(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to reach Botson's core: %w", err)
@@ -52,6 +59,17 @@ func runTUI(ctx context.Context, agentName string) error {
 		}
 	}
 
+	if resumeSessionID != "" {
+		if resumeUserID == "" {
+			resumeUserID = "tui"
+		}
+		info, err := client.GetSession(ctx, targetAgentName, resumeUserID, resumeSessionID)
+		if err != nil {
+			return fmt.Errorf("resuming session %q for agent %q (user %q): %w -- double check --agent and --user match what `botson sessions list` shows for this session (the web console's sessions use user \"web\", not \"tui\")", resumeSessionID, targetAgentName, resumeUserID, err)
+		}
+		return tuiinterface.Run(client, resumeSessionID, targetAgentName, info.Events)
+	}
+
 	sessionID := uuid.New().String()
 	if _, err := client.CreateSession(ctx, targetAgentName, "tui", sessionID, map[string]any{
 		"__session_metadata__": map[string]any{
@@ -61,7 +79,7 @@ func runTUI(ctx context.Context, agentName string) error {
 		return fmt.Errorf("creating chat session: %w", err)
 	}
 
-	return tuiinterface.Run(client, sessionID, targetAgentName)
+	return tuiinterface.Run(client, sessionID, targetAgentName, nil)
 }
 
 // ensureCoreRunning finds a Botson core for the TUI to talk to, preferring

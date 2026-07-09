@@ -103,6 +103,44 @@ func (c *Client) CreateSession(ctx context.Context, appName, userID, sessionID s
 	return out.ID, nil
 }
 
+// SessionInfo mirrors the subset of ADK's REST session response a caller
+// needs to resume a prior conversation: its stored events (to replay into
+// a fresh transcript) and state (which carries e.g. __session_metadata__).
+type SessionInfo struct {
+	Events []Event        `json:"events"`
+	State  map[string]any `json:"state"`
+}
+
+// GetSession calls GET /api/apps/{app}/users/{user}/sessions/{id}. Note
+// ADK's own handler returns 500, not 404, when the session doesn't exist
+// under that app/user pair -- callers should treat any non-200 here as
+// "no such session for this app/user", not just 404.
+func (c *Client) GetSession(ctx context.Context, appName, userID, sessionID string) (*SessionInfo, error) {
+	reqURL := fmt.Sprintf("%s/api/apps/%s/users/%s/sessions/%s", c.baseURL, url.PathEscape(appName), url.PathEscape(userID), url.PathEscape(sessionID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reach core: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("core returned %s fetching session: %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+
+	var out SessionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode session response: %w", err)
+	}
+	return &out, nil
+}
+
 // Run POSTs to /api/run_sse and streams back decoded Events, shaped like
 // runner.Runner.Run's own iterator so callers built against that need
 // minimal changes.

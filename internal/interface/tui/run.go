@@ -15,8 +15,11 @@ import (
 )
 
 // Run launches the interactive TUI chat program and blocks until the user
-// exits.
-func Run(client *apiclient.Client, sessionID, agentName string) error {
+// exits. priorEvents is non-nil when reattaching to an existing session
+// (see cmd/botson's `--session` flag) -- its turns are replayed into the
+// transcript before the program starts, so resuming looks like the
+// conversation never stopped; pass nil for a brand-new session.
+func Run(client *apiclient.Client, sessionID, agentName string, priorEvents []apiclient.Event) error {
 	// Redirect standard logger to a file to prevent polluting the terminal interface
 	logFile, errLog := os.OpenFile("tui.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if errLog == nil {
@@ -24,7 +27,7 @@ func Run(client *apiclient.Client, sessionID, agentName string) error {
 		defer logFile.Close()
 	}
 
-	m := newModel(client, sessionID, agentName)
+	m := newModel(client, sessionID, agentName, priorEvents)
 
 	program = tea.NewProgram(m, tea.WithAltScreen())
 	_, err := program.Run()

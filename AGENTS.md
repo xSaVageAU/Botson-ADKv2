@@ -131,6 +131,8 @@ Any flag left unset falls back to whatever's already in `config.json` (or a buil
 ```bash
 botson                          # same as `tui` — interactive terminal chat (unless DefaultCommand overrides this)
 botson tui --agent "Some Agent" # thin client; attaches to a running core if there is one, else runs a private one in-process (nothing left running after exit)
+botson tui --session ID         # reattach to an existing session instead of starting a new one, replaying its prior turns into the transcript
+botson tui --session ID --user web --agent "Some Agent" # resume a session from another interface -- `botson sessions list` shows its actual userId/agent (the web console's own sessions use user "web", not "tui")
 botson web --port=8080          # the unified core: REST/A2A APIs, web console, and (via toggleDiscord) Discord
 botson discord                  # standalone Discord gateway, foreground, tied to this terminal, independent of any core
 botson --help                   # list all commands and flags
@@ -201,6 +203,8 @@ botson sessions show <session-id> --agent NAME --user ID [--json]
 botson sessions delete <session-id> --agent NAME --user ID
 ```
 Thin CLI wrapper over `internal/management`'s `ListSessions`/`GetSession`/`DeleteSession`, built directly on `internal/session.InitPersistentSessionService` + `management.ListAgents()` rather than the full Gemini/agent-loader bootstrap — so, like `settings`/`agents`/`scripts`, it works even without a configured API key. A session's true identity is the composite key `(AppName, UserID, SessionID)` (see [docs/sessions.md](./docs/sessions.md)), not just the ID alone, which is why `show`/`delete` require `--agent`/`--user` — get those from `list`'s output first. `list`'s `eventCount` is always `0`: the underlying ADK `List` call doesn't preload events (only `Get` does, which `show` uses) — a pre-existing characteristic of the library, not a bug specific to this CLI, and the same limitation `internal/management.GetDashboardStats`'s web dashboard stats already have.
+
+`sessions show`/`delete` are read-only/lifecycle only -- they can't continue a conversation. To actually resume chatting in a past session, use `botson tui --session ID` (`--agent`/`--user` too, if it's not the default agent or wasn't created by the TUI): unlike `sessions show`, this attaches the TUI to that session over `/api/run_sse` and replays its prior turns into the transcript first (`internal/interface/tui/replay.go`), so it reads as if the conversation never stopped. A brand-new TUI session always runs under the fixed user `"tui"`, but resuming defaults `--user` to `"tui"` only as a starting guess -- a session created by the web console (always user `"web"`, see `main.js`'s `window.currentUser`) or Discord (its own per-account user ID) needs the matching `--user` explicitly, which `botson sessions list`'s `userId` column shows. `apiclient.Client.GetSession` (`GET /api/apps/{app}/users/{user}/sessions/{id}`) is what validates the session exists and fetches those events -- note ADK's own handler returns 500, not 404, for "no such session," so any non-200 there is treated as "not found for this agent/user," and `runTUI`'s error message says as much rather than surfacing the raw "record not found" database error on its own.
 
 ## Configuration reference
 

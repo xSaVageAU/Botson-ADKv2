@@ -48,6 +48,41 @@ func TestCreateSession(t *testing.T) {
 	}
 }
 
+func TestGetSession(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/api/apps/Agent%20Botson/users/tui/sessions/sess-1"
+		if r.URL.EscapedPath() != wantPath {
+			t.Fatalf("expected path %q, got %q", wantPath, r.URL.EscapedPath())
+		}
+		fmt.Fprint(w, `{"events":[{"author":"user","content":{"role":"user","parts":[{"text":"hi"}]}}],"state":{"k":"v"}}`)
+	}))
+	defer srv.Close()
+
+	info, err := New(srv.URL).GetSession(context.Background(), "Agent Botson", "tui", "sess-1")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+	if len(info.Events) != 1 || info.Events[0].Author != "user" {
+		t.Fatalf("unexpected events: %+v", info.Events)
+	}
+	if info.State["k"] != "v" {
+		t.Fatalf("unexpected state: %+v", info.State)
+	}
+}
+
+func TestGetSessionNonOKStatusIsAnError(t *testing.T) {
+	// ADK's own handler returns 500, not 404, for "no such session" --
+	// GetSession must still surface it as an error either way.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "session not found", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	if _, err := New(srv.URL).GetSession(context.Background(), "Agent Botson", "tui", "missing"); err == nil {
+		t.Fatal("expected an error for a non-200 response, got none")
+	}
+}
+
 func TestRunStreamsEvents(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/run_sse" {

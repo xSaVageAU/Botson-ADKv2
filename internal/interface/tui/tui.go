@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func newModel(client *apiclient.Client, sessionID, agentName string) model {
+func newModel(client *apiclient.Client, sessionID, agentName string, priorEvents []apiclient.Event) model {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message... (or type '/exit' to quit)"
 	ti.Focus()
@@ -27,7 +27,7 @@ func newModel(client *apiclient.Client, sessionID, agentName string) model {
 	vp := viewport.New(80, 20)
 	vp.SetContent("")
 
-	return model{
+	m := model{
 		viewport:   vp,
 		textInput:  ti,
 		spinner:    s,
@@ -39,6 +39,12 @@ func newModel(client *apiclient.Client, sessionID, agentName string) model {
 		toolStyle:  lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("208")),
 		hitlStyle:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")),
 	}
+
+	if len(priorEvents) > 0 {
+		m.history = replayHistory(priorEvents, agentName, m.userStyle, m.agentStyle, m.toolStyle)
+	}
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
