@@ -139,17 +139,18 @@ func GetDashboardStats(ctx context.Context, configLauncher *launcher.Config) (*D
 	}, nil
 }
 
-// ListSessionUsers returns the sorted set of unique session UserIDs across
-// all agents, always including the default "web" UI context even if no
-// sessions exist under it yet.
+// ListSessionUsers returns the sorted set of unique session UserIDs actually
+// present across all agents' session data -- the core makes no assumptions
+// about what user IDs a consumer uses, so there is no default/seed value
+// here; an empty slice means no sessions exist under any user yet.
 func ListSessionUsers(ctx context.Context, configLauncher *launcher.Config) ([]string, error) {
 	if configLauncher == nil || configLauncher.SessionService == nil || configLauncher.AgentLoader == nil {
-		return []string{"web"}, nil
+		return nil, nil
 	}
 
 	agentNames := configLauncher.AgentLoader.ListAgents()
 
-	userMap := map[string]bool{"web": true}
+	userMap := map[string]bool{}
 	for _, name := range agentNames {
 		listResponse, err := configLauncher.SessionService.List(ctx, &session.ListRequest{
 			AppName: name,
