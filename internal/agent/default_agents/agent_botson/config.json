@@ -9,8 +9,6 @@
     "updateSettings",
     "writeFile",
     "editFile",
-    "runCommand",
-    "saveScript",
-    "runScript"
+    "runCommand"
   ]
 }
