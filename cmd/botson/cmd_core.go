@@ -8,22 +8,28 @@ import (
 	"time"
 
 	"botsonv2/internal/daemon"
-	"botsonv2/internal/interface/natscore"
+	"botsonv2/internal/natsapi"
 
+	adkproxy "github.com/Savs-Agents/NATS-ADK-Proxy"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 const coreDaemonName = "core"
 const coreDisplayName = "Botson core"
 
-// newCoreCmd starts Botson's shared core: an embedded NATS server plus
-// internal/interface/natscore's subject handlers, wrapping the same
-// agent/session/artifact wiring every subcommand shares (see
-// cmd/botson/bootstrap.go). Any interface -- this repo's TUI, and future
-// standalone Discord/web projects -- talks to a running core purely over
-// NATS; nothing about this command is HTTP-specific anymore.
+// newCoreCmd starts Botson's core: the only process that ever holds the
+// Gemini model, agent registry, and session/artifact services, and the
+// only thing any consumer -- a Discord bot, a web UI, anything -- ever
+// talks to. It's an embedded NATS server plus two subject namespaces on
+// top of it: "adk.*" (an imported github.com/Savs-Agents/NATS-ADK-Proxy,
+// fronting the real ADK REST/A2A surface) and "botson.*"
+// (internal/natsapi, for settings/agents/sessions/scripts/dashboard --
+// state that isn't part of stock ADK's own API). There is no other
+// interface in this binary; nothing about this command dispatches to a
+// TUI or any other in-process consumer.
 func newCoreCmd() *cobra.Command {
 	var port int
 
@@ -111,19 +117,13 @@ func newCoreStatusCmd() *cobra.Command {
 	}
 }
 
-// runCore starts Botson's shared core and registers it in the shared
+// runCore starts Botson's core and registers it in the shared
 // daemon-state/control-channel system (internal/daemon) so `botson core
-// status/stop` -- and other clients looking for a core to attach to, like
-// `botson tui` -- can find and manage it. This happens no matter how the
+// status/stop` can find and manage it. This happens no matter how the
 // process was launched: directly (`botson core`), detached (`core start`),
 // or under an external supervisor like systemd (a plain `ExecStart=botson
 // core` unit works fine here -- systemd doesn't need this process to
 // self-detach).
-//
-// Use runCoreServer directly instead of this for a private, unregistered
-// core -- that's what cmd_tui.go's startEmbeddedCore does, since a TUI's
-// own auto-started fallback core must NOT be discoverable/stoppable this
-// way (see ensureCoreRunning).
 func runCore(ctx context.Context, port int) error {
 	daemonCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -147,12 +147,11 @@ func runCore(ctx context.Context, port int) error {
 	return runCoreServer(daemonCtx, port, false)
 }
 
-// runCoreServer is the actual core -- an embedded NATS server plus
-// internal/interface/natscore's subject handlers -- with no daemon-state
-// registration of its own. quiet suppresses the startup banner, for the
-// embedded-in-TUI case where it would otherwise print stray output just
-// before the TUI's alt-screen takes over the terminal. Blocks until ctx is
-// done, then shuts the embedded server down.
+// runCoreServer is the actual core -- an embedded NATS server plus the two
+// subject namespaces described on newCoreCmd -- with no daemon-state
+// registration of its own. quiet suppresses the startup banner. Blocks
+// until ctx is done (or either namespace's server exits unexpectedly),
+// then shuts everything down.
 func runCoreServer(ctx context.Context, port int, quiet bool) error {
 	srv, err := server.NewServer(&server.Options{Host: "127.0.0.1", Port: port, NoLog: quiet})
 	if err != nil {
@@ -174,7 +173,19 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 		fmt.Printf("Starting Botson's core on nats://127.0.0.1:%d... please do not close this window.\n", port)
 	}
 
-	if err := natscore.Serve(ctx, nc, boot.Launcher); err != nil {
+	proxy, err := adkproxy.New(adkproxy.Config{
+		NATSConn:      nc,
+		ADK:           *boot.Launcher,
+		SubjectPrefix: "adk",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to configure the ADK NATS gateway: %w", err)
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error { return proxy.Run(gctx) })
+	g.Go(func() error { return natsapi.Serve(gctx, nc, boot.Launcher) })
+	if err := g.Wait(); err != nil {
 		return fmt.Errorf("core server execution failed: %w", err)
 	}
 	return nil

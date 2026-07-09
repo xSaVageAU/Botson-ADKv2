@@ -13,17 +13,6 @@ type AppConfig struct {
 	ModelName    string `json:"model_name"`
 	GeminiAPIKey string `json:"gemini_api_key"`
 	RootAgent    string `json:"root_agent"`
-
-	// WorkspaceDir is the directory background/detached processes (tray,
-	// and anything tray itself spawns) operate in when they have no
-	// meaningful working directory of their own to inherit -- e.g. tray
-	// launched via a login-time autostart entry. Set once by `setup
-	// install` (defaulting to wherever install was run from) or `botson
-	// settings set`. Processes launched directly from a terminal (`botson
-	// core start`) instead use their own actual cwd and ignore this field
-	// entirely -- it exists only for the cases that have no real cwd to
-	// fall back on.
-	WorkspaceDir string `json:"workspace_dir,omitempty"`
 }
 
 // MaskedSecret is the placeholder Mask substitutes for secret fields, and

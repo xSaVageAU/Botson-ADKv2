@@ -52,21 +52,16 @@ Each event records:
 
 ## 4. NATS API Subject Reference
 
-The core (`botson core`, an embedded NATS server) exposes the following subjects for session management (`internal/interface/natscore`):
+The core (`botson core`, an embedded NATS server) exposes session management over two subject namespaces -- see [docs/process-architecture.md](./process-architecture.md) for why it's split this way:
 
-### Create Session
-- **Subject:** `botson.session.create`
-- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "...", "state": {} }`
-- **Behavior:** Creates a new session record on the backend. If `sessionId` is empty, generates a standard UUID and returns it.
+### Create / get / run a session (standard ADK surface)
+Fronted by an imported [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) under the `adk.` prefix, byte-for-byte matching upstream ADK's own REST/A2A behavior -- session create, get, and running a turn all go through `adk.rest.*` (see that package's README for the exact subject/header contract). **Note:** NATS-ADK-Proxy doesn't yet implement streaming (`run_sse`) -- a run is currently request/reply, returning the full turn's events at once rather than streaming them frame-by-frame the way the old hand-rolled `botson.run` subject did.
 
-### Get Session Details
-- **Subject:** `botson.session.get`
-- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "..." }`
-- **Behavior:** Returns the session state and all chronological history events.
+### List / inspect / delete a session (dashboard view)
+`internal/natsapi`'s `botson.sessions.*` subjects, under the `botson.` prefix -- a dashboard-shaped view (display name extraction, event-text summaries) distinct from the raw ADK session objects above:
 
-### Run (streaming)
-- **Subject:** `botson.run`
-- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "...", "newMessage": <genai.Content> }`, published with a caller-generated reply inbox.
-- **Behavior:** Streams one `Frame{event: ...}` per session event to the reply inbox, terminated by exactly one final `Frame{done: true}` or `Frame{error: "..."}`.
+- **`botson.sessions.list`** -- `{ "agent": "...", "user": "..." }` (both optional filters) → every session's summary stats, most-recently-updated first.
+- **`botson.sessions.get`** -- `{ "agent": "...", "user": "...", "sessionId": "..." }` → full state + event history for one session.
+- **`botson.sessions.delete`** -- `{ "agent": "...", "user": "...", "sessionId": "..." }` → deletes a session by its full composite key.
 
-List and delete aren't exposed over NATS today -- `botson sessions list/show/delete` read the session database directly instead (see [AGENTS.md](../AGENTS.md)'s "Sessions" CLI reference), so they work even without a core running.
+A session's true identity is always the composite key (`app_name`, `user_id`, `session_id`) described in §1 above -- the session ID alone is not enough to look one up.

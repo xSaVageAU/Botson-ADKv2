@@ -1,16 +1,18 @@
+// Package setup implements `botson setup install`: writing the initial
+// ~/.botsonv2/config.json a core needs before it can start (the Gemini API
+// key, above all -- there's no NATS server yet at this point for a client
+// to configure that over, so this one step has to stay a local,
+// direct-to-disk operation). Plain functions, no Cobra awareness, so
+// cmd/botson stays a thin wrapper -- same shape as internal/daemon and
+// internal/management.
 package setup
 
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"botsonv2/internal/config"
-	"botsonv2/internal/daemon"
 	"botsonv2/internal/management"
 )
 
@@ -19,24 +21,17 @@ import (
 // `setup install` without a terminal attached for prompts. Any field left
 // at its zero value is treated as "not answered" and falls back to
 // whatever's already in the config (or the built-in default for a
-// brand-new one) instead of prompting for it. Tray fields are pointers so
-// "not passed" (nil) can be told apart from an explicit false.
+// brand-new one) instead of prompting for it.
 type InstallOptions struct {
 	NonInteractive bool
 
 	GeminiAPIKey string
 	ModelName    string
 	RootAgent    string
-
-	RegisterTrayAutostart *bool
-	StartTrayNow          *bool
 }
 
-// Install walks a user through first-time setup: Gemini API key, then root
-// agent, then copies the binary to its stable install location, adds it to
-// PATH, and (Windows only) offers to register the tray icon to start at
-// login. With opts.NonInteractive, the prompts are skipped entirely in
-// favor of opts.
+// Install writes ~/.botsonv2/config.json: Gemini API key, then root agent.
+// With opts.NonInteractive, prompts are skipped entirely in favor of opts.
 func Install(ctx context.Context, opts InstallOptions) error {
 	fmt.Println("Botson Setup - Install")
 	fmt.Println("======================")
@@ -44,21 +39,6 @@ func Install(ctx context.Context, opts InstallOptions) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Record the directory install was run from as the workspace fallback
-	// for processes with no meaningful cwd of their own (tray, launched via
-	// a login-time autostart entry) -- set once, persisted immediately via
-	// config.Update (which mutates cfg in place, since it's the same cached
-	// instance Load() just returned) regardless of which branch below runs,
-	// since reconfigure=false skips every other config.Save call in this
-	// function.
-	if cfg.WorkspaceDir == "" {
-		if wd, wdErr := os.Getwd(); wdErr == nil {
-			if _, err := config.Update(func(c *config.AppConfig) { c.WorkspaceDir = wd }); err != nil {
-				return fmt.Errorf("failed to save workspace directory: %w", err)
-			}
-		}
 	}
 
 	if opts.NonInteractive {
@@ -89,61 +69,10 @@ func Install(ctx context.Context, opts InstallOptions) error {
 		}
 	}
 
-	if err := installBinary(); err != nil {
-		return err
-	}
-
-	installDir, err := InstallDir()
-	if err != nil {
-		return err
-	}
-	if err := AddToPath(installDir); err != nil {
-		fmt.Printf("Warning: failed to update PATH automatically: %v\n", err)
-		fmt.Printf("Add this directory to your PATH manually: %s\n", installDir)
-	}
-
-	if runtime.GOOS == "windows" {
-		registerTray := true
-		if opts.NonInteractive {
-			registerTray = opts.RegisterTrayAutostart != nil && *opts.RegisterTrayAutostart
-		} else {
-			registerTray, err = AskYesNo("Start the Botson tray icon automatically at login?", true)
-			if err != nil {
-				return err
-			}
-		}
-		if registerTray {
-			binPath, err := InstalledBinaryPath()
-			if err != nil {
-				return err
-			}
-			if err := RegisterTrayAutostart(binPath); err != nil {
-				fmt.Printf("Warning: failed to register tray autostart: %v\n", err)
-			} else {
-				fmt.Println("Tray icon will start automatically at login.")
-			}
-		}
-
-		startNow := true
-		if opts.NonInteractive {
-			startNow = opts.StartTrayNow != nil && *opts.StartTrayNow
-		} else {
-			startNow, err = AskYesNo("Start the Botson tray icon now?", true)
-			if err != nil {
-				return err
-			}
-		}
-		if startNow {
-			if _, _, err := daemon.Start("tray", "Tray icon", cfg.WorkspaceDir, []string{"tray", "__daemon-child"}); err != nil {
-				fmt.Printf("Warning: failed to start the tray icon: %v\n", err)
-			} else {
-				fmt.Println("Tray icon started.")
-			}
-		}
-	}
-
 	fmt.Println()
-	fmt.Println("Setup complete! Open a new terminal and run `botson` to get started.")
+	fmt.Println("Setup complete! Run `botson core start` to bring the core online, then")
+	fmt.Println("talk to it over NATS -- see internal/natsapi/subjects.go and")
+	fmt.Println("NATS-ADK-Proxy's README for the full subject list.")
 	return nil
 }
 
@@ -168,50 +97,6 @@ func applyInstallOptions(cfg *config.AppConfig, opts InstallOptions) error {
 		cfg.RootAgent = "Agent Botson"
 	}
 
-	return nil
-}
-
-// installBinary copies the currently running executable to its stable
-// install path, unless it's already running from there.
-func installBinary() error {
-	src, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to resolve current executable: %w", err)
-	}
-
-	dst, err := InstalledBinaryPath()
-	if err != nil {
-		return err
-	}
-
-	srcAbs, _ := filepath.EvalSymlinks(src)
-	dstAbs, _ := filepath.EvalSymlinks(dst)
-	if srcAbs != "" && srcAbs == dstAbs {
-		fmt.Println("Already running from the installed location; skipping binary copy.")
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return fmt.Errorf("failed to create install directory: %w", err)
-	}
-
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open current executable: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create installed binary: %w", err)
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("failed to copy binary: %w", err)
-	}
-
-	fmt.Printf("Installed to %s\n", dst)
 	return nil
 }
 
@@ -266,9 +151,7 @@ func promptRootAgent(cfg *config.AppConfig) error {
 	return nil
 }
 
-// runConfigWizard runs the full set of prompts in order; Reset reuses the
-// individual prompt* functions directly for whichever categories aren't
-// kept, rather than calling this.
+// runConfigWizard runs the full set of prompts in order.
 func runConfigWizard(cfg *config.AppConfig) error {
 	if err := promptGeminiAPIKey(cfg); err != nil {
 		return err

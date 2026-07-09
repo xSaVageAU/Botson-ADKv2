@@ -1,5 +1,5 @@
 // Package daemon provides a generic detach/control lifecycle for
-// backgroundable subcommands (discord, web, tray) of a single executable.
+// backgroundable subcommands (today, just `core`) of a single executable.
 // It is deliberately CLI/HTTP-agnostic -- callers (Cobra subcommands, HTTP
 // handlers) format Status/errors for their own audience.
 package daemon

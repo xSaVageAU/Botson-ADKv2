@@ -6,17 +6,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newSetupCmd groups the install/uninstall/reset lifecycle. None of these
-// can assume a working config/Gemini/agent setup exists yet (installing is
-// the whole point), so noBootstrap is set once here and inherited by all
-// three children -- same pattern as the tray parent command.
+// newSetupCmd is the one local, direct-to-disk bootstrap step: writing
+// ~/.botsonv2/config.json (Gemini API key, above all) before any core or
+// NATS server exists for a client to configure that over. Everything else
+// about running Botson happens over NATS once a core is up -- see
+// internal/natsapi.
 func newSetupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "setup",
-		Short:             "Install, uninstall, or reset this Botson installation",
+		Short:             "Write Botson's initial configuration",
 		PersistentPreRunE: noBootstrap,
 	}
-	cmd.AddCommand(newSetupInstallCmd(), newSetupUninstallCmd(), newSetupResetCmd(), newSetupStatusCmd())
+	cmd.AddCommand(newSetupInstallCmd())
 	return cmd
 }
 
@@ -26,14 +27,12 @@ func newSetupInstallCmd() *cobra.Command {
 		geminiAPIKey   string
 		modelName      string
 		rootAgent      string
-		trayAutostart  bool
-		startTray      bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Interactively configure Botson and install it onto this machine",
-		Long: "Interactively configure Botson and install it onto this machine.\n\n" +
+		Short: "Interactively configure Botson (Gemini API key, root agent)",
+		Long: "Interactively configure Botson: Gemini API key, then root agent.\n\n" +
 			"Pass --non-interactive along with the flags below to drive this from a script " +
 			"or another agent instead of answering prompts. Any flag left unset falls back " +
 			"to whatever's already in the config (or a built-in default on a fresh install) " +
@@ -45,12 +44,6 @@ func newSetupInstallCmd() *cobra.Command {
 				ModelName:      modelName,
 				RootAgent:      rootAgent,
 			}
-			if cmd.Flags().Changed("tray-autostart") {
-				opts.RegisterTrayAutostart = &trayAutostart
-			}
-			if cmd.Flags().Changed("start-tray") {
-				opts.StartTrayNow = &startTray
-			}
 			return setup.Install(cmd.Context(), opts)
 		},
 	}
@@ -59,41 +52,6 @@ func newSetupInstallCmd() *cobra.Command {
 	cmd.Flags().StringVar(&geminiAPIKey, "gemini-api-key", "", "Gemini API key (required on a first install if --non-interactive)")
 	cmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (default: gemini-3.1-flash-lite)")
 	cmd.Flags().StringVar(&rootAgent, "root-agent", "", "Root agent name (default: Agent Botson)")
-	cmd.Flags().BoolVar(&trayAutostart, "tray-autostart", false, "Register the tray icon to start at login (Windows only)")
-	cmd.Flags().BoolVar(&startTray, "start-tray", false, "Start the tray icon immediately after install (Windows only)")
 
 	return cmd
-}
-
-func newSetupUninstallCmd() *cobra.Command {
-	var forceFull bool
-	cmd := &cobra.Command{
-		Use:   "uninstall",
-		Short: "Selectively remove Botson from PATH/startup and/or delete the installed binary and data",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return setup.Uninstall(cmd.Context(), forceFull)
-		},
-	}
-	cmd.Flags().BoolVar(&forceFull, "force-full-uninstall", false, "Skip all prompts and completely wipe ~/.botsonv2 (PATH, startup, binary, and config.json)")
-	return cmd
-}
-
-func newSetupResetCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "reset",
-		Short: "Selectively reset configuration and/or session data, then reconfigure",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return setup.Reset(cmd.Context())
-		},
-	}
-}
-
-func newSetupStatusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show whether Botson is installed, on PATH, and which services are running",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return setup.Status(cmd.Context())
-		},
-	}
 }
