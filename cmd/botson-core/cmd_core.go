@@ -9,6 +9,7 @@ import (
 
 	"botson/internal/daemon"
 	"botson/internal/natsapi"
+	"botson/internal/procutil"
 
 	adkproxy "github.com/Savs-Agents/NATS-ADK-Proxy"
 	"github.com/nats-io/nats-server/v2/server"
@@ -185,6 +186,20 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 		NATSConn:      nc,
 		ADK:           *boot.Launcher,
 		SubjectPrefix: "adk",
+		// The gateway's own per-request HTTP deadline to the local ADK
+		// backend defaults to a fixed 30s (NATS-ADK-Proxy's
+		// gateway.Options.RequestTimeout), which is shorter than
+		// runCommand's own default subprocess timeout
+		// (procutil.DefaultTimeout) -- a turn with even one
+		// default-timeout runCommand call, or a few sequential
+		// tool/model round trips, would blow past 30s and fail with
+		// "context deadline exceeded" before the run itself actually
+		// failed. Give it real headroom above the longest normal tool
+		// call instead. Botson-TUI's own NATS request timeout
+		// (adkclient.WithTimeout in its internal/natsapi/client.go)
+		// must stay above this value too, or it becomes the new
+		// bottleneck.
+		RequestTimeout: procutil.DefaultTimeout + 90*time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to configure the ADK NATS gateway: %w", err)
