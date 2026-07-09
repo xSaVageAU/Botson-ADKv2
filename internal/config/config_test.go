@@ -9,7 +9,7 @@ import (
 // TestUpdateMutatesSharedInstanceInPlace guards the guarantee that makes
 // self-configuration mid-conversation possible: Update must mutate the
 // exact struct Load already handed out, not swap in a new one, so every
-// other holder of that pointer (e.g. cmd/botson's appBoot.Config) sees the
+// other holder of that pointer (e.g. cmd/botson-core's appBoot.Config) sees the
 // change without needing to reload.
 func TestUpdateMutatesSharedInstanceInPlace(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())

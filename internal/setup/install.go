@@ -3,7 +3,7 @@
 // key, above all -- there's no NATS server yet at this point for a client
 // to configure that over, so this one step has to stay a local,
 // direct-to-disk operation). Plain functions, no Cobra awareness, so
-// cmd/botson stays a thin wrapper -- same shape as internal/daemon and
+// cmd/botson-core stays a thin wrapper -- same shape as internal/daemon and
 // internal/management.
 package setup
 

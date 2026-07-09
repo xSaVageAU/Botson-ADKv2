@@ -44,7 +44,7 @@ func GetConfigPath() (string, error) {
 // mu guards cached, the shared in-process configuration instance. Every
 // Load within a single process returns this same *AppConfig after the
 // first call, and Update mutates its fields in place (rather than
-// replacing the pointer) so every other holder of it -- e.g. cmd/botson's
+// replacing the pointer) so every other holder of it -- e.g. cmd/botson-core's
 // appBoot.Config -- sees the change immediately, without waiting for a
 // restart. Cross-process staleness (another botson process editing the
 // same file) is unaffected: each process still only picks up disk changes

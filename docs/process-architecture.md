@@ -133,7 +133,7 @@ sending SIGTERM to an arbitrary process -- the same mechanism is used on
 Linux too, for consistency. `--force` skips all of this and just calls
 `os.Process.Kill`.
 
-**Who writes the state file**: `runCore` (`cmd/botson/cmd_core.go`)
+**Who writes the state file**: `runCore` (`cmd/botson-core/cmd_core.go`)
 always registers -- whether it was invoked as a plain foreground
 `botson core`, as `core start`'s detached child, or under an external
 process supervisor like systemd. There is no separate hidden "daemon
@@ -153,7 +153,7 @@ botson core status                                  # reads the state file + pro
 botson core stop [--force]                          # graceful stop via control channel, or force-kill
 ```
 
-Internally (`cmd/botson/cmd_core.go`), `runCore` does the registration
+Internally (`cmd/botson-core/cmd_core.go`), `runCore` does the registration
 (state file + control listener) and then calls `runCoreServer`, which does
 the actual work: build an embedded `*server.Server` (`nats-server/v2/server`)
 on the given loopback port, `.Start()` it, wait for `ReadyForConnections`,

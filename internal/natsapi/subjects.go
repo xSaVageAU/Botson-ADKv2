@@ -2,7 +2,7 @@
 // subjects covering everything about running Botson that isn't part of
 // stock ADK's REST/A2A surface -- that surface is fronted separately by an
 // imported github.com/Savs-Agents/NATS-ADK-Proxy under the "adk." subject
-// prefix (see cmd/botson/cmd_core.go). This package's subjects, all under
+// prefix (see cmd/botson-core/cmd_core.go). This package's subjects, all under
 // "botson.", cover settings, custom-agent CRUD, and session/dashboard
 // management -- the things every CLI subcommand used to do by touching
 // config.json/the session DB/~/.botsonv2/agents directly. Every subject

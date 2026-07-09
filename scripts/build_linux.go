@@ -19,11 +19,11 @@ func main() {
 		os.Mkdir(outputDir, 0755)
 	}
 
-	outputPath := filepath.Join(outputDir, "botsonv2-linux-amd64")
-	fmt.Println("Building botsonv2 for linux/amd64...")
+	outputPath := filepath.Join(outputDir, "botson-linux-amd64")
+	fmt.Println("Building botson for linux/amd64...")
 
 	cmd := exec.Command("go", "build", "-o", outputPath, ".")
-	cmd.Dir = filepath.Join(rootDir, "cmd/botson")
+	cmd.Dir = filepath.Join(rootDir, "cmd/botson-core")
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
 
 	output, err := cmd.CombinedOutput()

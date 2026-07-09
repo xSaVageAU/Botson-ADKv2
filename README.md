@@ -21,11 +21,11 @@ You'll need a [Gemini API key](https://aistudio.google.com/apikey) and Go 1.26+ 
 ```bash
 go run scripts/build_linux.go     # or build_windows.go on Windows
 ```
-This produces `bin/botsonv2-<os>-<arch>`.
+This produces `bin/botson-<os>-<arch>`.
 
 **2. Configure**
 ```bash
-./bin/botsonv2-linux-amd64 setup install
+./bin/botson-linux-amd64 setup install
 ```
 An interactive wizard asks for your Gemini API key and root agent, and writes `~/.botsonv2/config.json`. This is the only step that isn't a NATS call — it has to run before any core exists for a client to configure that over.
 

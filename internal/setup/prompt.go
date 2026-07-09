@@ -1,7 +1,7 @@
 // Package setup implements the `botson setup install/uninstall/reset`
 // commands: getting the binary onto the machine (and PATH), tearing it back
 // off, and resetting config/data to a clean slate. Plain functions, no Cobra
-// awareness, so cmd/botson stays a thin wrapper -- same shape as internal/daemon
+// awareness, so cmd/botson-core stays a thin wrapper -- same shape as internal/daemon
 // and internal/management.
 package setup
 

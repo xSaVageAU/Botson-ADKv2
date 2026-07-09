@@ -27,7 +27,7 @@ type UpdateSettingsResult struct {
 // UpdateSettings lets the running agent change its own non-secret settings
 // mid-conversation. The change is written to disk immediately via
 // config.Update, which also mutates the shared in-memory config this
-// process is already holding (e.g. cmd/botson's appBoot.Config), so it
+// process is already holding (e.g. cmd/botson-core's appBoot.Config), so it
 // takes effect for the rest of this run without needing a restart.
 func UpdateSettings(ctx agent.Context, args UpdateSettingsArgs) (UpdateSettingsResult, error) {
 	cfg, err := config.Update(func(cfg *config.AppConfig) {
