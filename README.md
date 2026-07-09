@@ -8,7 +8,7 @@ It can read and manage files, hold persistent conversations, and ask for approva
 
 - **One core, NATS-only** — `botson core` is the only process that ever holds the agent runtime; nothing about running Botson requires a specific frontend
 - **Standard ADK surface over NATS** — list-apps, sessions, running a turn, and A2A, fronted by an imported [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) under the `adk.` subject prefix, matching upstream ADK's own REST/A2A behavior exactly
-- **Botson-specific state over NATS too** — settings, custom-agent CRUD, named scripts, and dashboard-shaped session listing, under the `botson.` subject prefix (`internal/natsapi`) — nothing requires touching `~/.botsonv2/` files directly
+- **Botson-specific state over NATS too** — settings, custom-agent CRUD, and dashboard-shaped session listing, under the `botson.` subject prefix (`internal/natsapi`) — nothing requires touching `~/.botsonv2/` files directly
 - **Human-in-the-loop approvals** — sensitive tool calls pause for a yes/no confirmation
 - **Custom agents** — define your own agents and tool sets, saved under `~/.botsonv2/agents/`
 - **Background core** — runs detached, with `start`/`stop`/`status`, or under a real service supervisor (systemd, etc.)

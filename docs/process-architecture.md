@@ -55,10 +55,9 @@ service, artifact service):
   and wire-header contract.
 - **`botson.*`** -- `internal/natsapi`, for the state that isn't part of
   stock ADK's API: settings (`botson.settings.*`), custom-agent CRUD
-  (`botson.agents.*`), named scripts (`botson.scripts.*`), and
-  dashboard-shaped session listing/inspection (`botson.sessions.*`,
-  `botson.dashboard.*`). See `internal/natsapi/subjects.go` for the full
-  subject table.
+  (`botson.agents.*`), and dashboard-shaped session listing/inspection
+  (`botson.sessions.*`, `botson.dashboard.*`). See
+  `internal/natsapi/subjects.go` for the full subject table.
 
 ```
                      ┌─────────────────────────────────────┐

@@ -26,8 +26,8 @@ const coreDisplayName = "Botson core"
 // talks to. It's an embedded NATS server plus two subject namespaces on
 // top of it: "adk.*" (an imported github.com/Savs-Agents/NATS-ADK-Proxy,
 // fronting the real ADK REST/A2A surface) and "botson.*"
-// (internal/natsapi, for settings/agents/sessions/scripts/dashboard --
-// state that isn't part of stock ADK's own API). There is no other
+// (internal/natsapi, for settings/agents/sessions/dashboard -- state
+// that isn't part of stock ADK's own API). There is no other
 // interface in this binary; nothing about this command dispatches to a
 // TUI or any other in-process consumer.
 func newCoreCmd() *cobra.Command {

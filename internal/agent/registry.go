@@ -64,20 +64,6 @@ var availableTools = map[string]toolBuilder{
 			RequireConfirmation: true,
 		}, tools.RunCommand)
 	},
-	"saveScript": func() (tool.Tool, error) {
-		return functiontool.New(functiontool.Config{
-			Name:                "saveScript",
-			Description:         "Saves a named Go program to ~/.botsonv2/scripts/<name>/main.go, runnable later by name via runScript or `botson script run` -- for reusable automation instead of rewriting the same code inline every time.",
-			RequireConfirmation: true,
-		}, tools.SaveScript)
-	},
-	"runScript": func() (tool.Tool, error) {
-		return functiontool.New(functiontool.Config{
-			Name:                "runScript",
-			Description:         "Runs a previously saved script by name (see saveScript or `botson script list`) and returns its stdout, stderr, and exit code.",
-			RequireConfirmation: true,
-		}, tools.RunScript)
-	},
 }
 
 // GetAvailableTools returns the sorted list of all registered tool names in the registry.

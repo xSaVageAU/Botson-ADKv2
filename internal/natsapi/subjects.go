@@ -3,10 +3,10 @@
 // stock ADK's REST/A2A surface -- that surface is fronted separately by an
 // imported github.com/Savs-Agents/NATS-ADK-Proxy under the "adk." subject
 // prefix (see cmd/botson/cmd_core.go). This package's subjects, all under
-// "botson.", cover settings, custom-agent CRUD, named scripts, and
-// session/dashboard management -- the things every CLI subcommand used to
-// do by touching config.json/the session DB/~/.botsonv2/agents directly.
-// Every subject here is plain request/reply; none of it needs streaming.
+// "botson.", cover settings, custom-agent CRUD, and session/dashboard
+// management -- the things every CLI subcommand used to do by touching
+// config.json/the session DB/~/.botsonv2/agents directly. Every subject
+// here is plain request/reply; none of it needs streaming.
 package natsapi
 
 const (
@@ -21,12 +21,6 @@ const (
 	SubjectSessionsList   = "botson.sessions.list"
 	SubjectSessionsGet    = "botson.sessions.get"
 	SubjectSessionsDelete = "botson.sessions.delete"
-
-	SubjectScriptsList   = "botson.scripts.list"
-	SubjectScriptsGet    = "botson.scripts.get"
-	SubjectScriptsSave   = "botson.scripts.save"
-	SubjectScriptsDelete = "botson.scripts.delete"
-	SubjectScriptsRun    = "botson.scripts.run"
 
 	SubjectDashboardStats = "botson.dashboard.stats"
 	SubjectDashboardUsers = "botson.dashboard.users"
@@ -76,35 +70,3 @@ type SessionsDeleteRequest struct {
 	SessionID string `json:"sessionId"`
 }
 
-// ScriptsGetRequest and ScriptsDeleteRequest identify a script by name.
-type ScriptsGetRequest struct {
-	Name string `json:"name"`
-}
-
-type ScriptsDeleteRequest struct {
-	Name string `json:"name"`
-}
-
-// ScriptsSaveRequest is the request payload for SubjectScriptsSave.
-type ScriptsSaveRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Source      string `json:"source"`
-}
-
-// ScriptsRunRequest is the request payload for SubjectScriptsRun.
-type ScriptsRunRequest struct {
-	Name           string   `json:"name"`
-	Args           []string `json:"args,omitempty"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
-}
-
-// ScriptsRunReply carries a run's captured output and exit code -- an
-// ExitCode != 0 is not itself an Error, same distinction procutil.Result
-// draws between "ran and failed" and "gateway/build itself failed".
-type ScriptsRunReply struct {
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	ExitCode int    `json:"exitCode"`
-	Error    string `json:"error,omitempty"`
-}

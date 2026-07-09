@@ -5,9 +5,8 @@
 // `sh -c "sleep 5"` on some platforms) would otherwise keep running past
 // its parent's death, holding the captured stdout/stderr pipe open until
 // it exits on its own -- silently defeating the timeout. This is the one
-// place that fix lives, shared by every caller that shells out
-// (internal/tools' runCommand, internal/scripts' script runner) instead of each
-// reimplementing (and re-debugging) it.
+// place that fix lives, used by internal/tools' runCommand instead of
+// reimplementing (and re-debugging) it there.
 package procutil
 
 import (

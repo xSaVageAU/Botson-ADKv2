@@ -11,12 +11,11 @@ import (
 	"botsonv2/internal/agent"
 	"botsonv2/internal/config"
 	"botsonv2/internal/management"
-	"botsonv2/internal/scripts"
 )
 
 // Serve subscribes to every subject in this package, answering requests
 // using cfg's agent loader/session service directly (for the
-// dashboard/sessions handlers) or the config/scripts packages directly (for
+// dashboard/sessions handlers) or the config package directly (for
 // everything else, which needs no launcher at all), then blocks until ctx
 // is done, at which point it unsubscribes and returns.
 func Serve(ctx context.Context, nc *nats.Conn, cfg *launcher.Config) error {
@@ -35,12 +34,6 @@ func Serve(ctx context.Context, nc *nats.Conn, cfg *launcher.Config) error {
 		{SubjectSessionsList, handleSessionsList(ctx, cfg)},
 		{SubjectSessionsGet, handleSessionsGet(ctx, cfg)},
 		{SubjectSessionsDelete, handleSessionsDelete(ctx, cfg)},
-
-		{SubjectScriptsList, handleScriptsList()},
-		{SubjectScriptsGet, handleScriptsGet()},
-		{SubjectScriptsSave, handleScriptsSave()},
-		{SubjectScriptsDelete, handleScriptsDelete()},
-		{SubjectScriptsRun, handleScriptsRun(ctx)},
 
 		{SubjectDashboardStats, handleDashboardStats(ctx, cfg)},
 		{SubjectDashboardUsers, handleDashboardUsers(ctx, cfg)},
@@ -242,89 +235,6 @@ func handleSessionsDelete(ctx context.Context, cfg *launcher.Config) nats.MsgHan
 			return
 		}
 		respond(msg, map[string]string{})
-	}
-}
-
-func handleScriptsList() nats.MsgHandler {
-	return func(msg *nats.Msg) {
-		details, err := scripts.List()
-		if err != nil {
-			respondError(msg, err)
-			return
-		}
-		respond(msg, details)
-	}
-}
-
-func handleScriptsGet() nats.MsgHandler {
-	return func(msg *nats.Msg) {
-		var req ScriptsGetRequest
-		if err := json.Unmarshal(msg.Data, &req); err != nil {
-			respondError(msg, err)
-			return
-		}
-
-		details, err := scripts.List()
-		if err != nil {
-			respondError(msg, err)
-			return
-		}
-		for _, d := range details {
-			if d.Name == req.Name {
-				respond(msg, d)
-				return
-			}
-		}
-		respondError(msg, fmt.Errorf("script %q not found", req.Name))
-	}
-}
-
-func handleScriptsSave() nats.MsgHandler {
-	return func(msg *nats.Msg) {
-		var req ScriptsSaveRequest
-		if err := json.Unmarshal(msg.Data, &req); err != nil {
-			respondError(msg, err)
-			return
-		}
-
-		detail := scripts.Detail{Name: req.Name, Description: req.Description, Source: req.Source}
-		if err := scripts.Save(detail); err != nil {
-			respondError(msg, err)
-			return
-		}
-		respond(msg, map[string]string{})
-	}
-}
-
-func handleScriptsDelete() nats.MsgHandler {
-	return func(msg *nats.Msg) {
-		var req ScriptsDeleteRequest
-		if err := json.Unmarshal(msg.Data, &req); err != nil {
-			respondError(msg, err)
-			return
-		}
-		if err := scripts.Delete(req.Name); err != nil {
-			respondError(msg, err)
-			return
-		}
-		respond(msg, map[string]string{})
-	}
-}
-
-func handleScriptsRun(ctx context.Context) nats.MsgHandler {
-	return func(msg *nats.Msg) {
-		var req ScriptsRunRequest
-		if err := json.Unmarshal(msg.Data, &req); err != nil {
-			respondError(msg, err)
-			return
-		}
-
-		result, err := scripts.Run(ctx, req.Name, req.Args, req.TimeoutSeconds)
-		if err != nil {
-			respond(msg, ScriptsRunReply{Error: err.Error()})
-			return
-		}
-		respond(msg, ScriptsRunReply{Stdout: result.Stdout, Stderr: result.Stderr, ExitCode: result.ExitCode})
 	}
 }
 
