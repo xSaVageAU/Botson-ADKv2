@@ -10,9 +10,12 @@ import (
 	"botson/internal/config"
 	"botson/internal/providers"
 	coresession "botson/internal/session"
+	"botson/internal/toolorder"
 	"botson/internal/tools"
 
 	"google.golang.org/adk/v2/cmd/launcher"
+	"google.golang.org/adk/v2/plugin"
+	"google.golang.org/adk/v2/runner"
 )
 
 // appBoot bundles the shared services every subcommand needs: the loaded
@@ -68,6 +71,7 @@ func setupApp(ctx context.Context) (*appBoot, error) {
 			SessionService:  dbSessionService,
 			ArtifactService: localArtifactService,
 			AgentLoader:     loader,
+			PluginConfig:    runner.PluginConfig{Plugins: []*plugin.Plugin{toolorder.New()}},
 		},
 	}, nil
 }
