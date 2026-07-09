@@ -95,6 +95,7 @@ func handleSettingsSet() nats.MsgHandler {
 			respondError(msg, err)
 			return
 		}
+		modelOrProviderChanged := req.ModelName != nil || req.Provider != nil
 
 		cfg, err := config.Update(func(cfg *config.AppConfig) {
 			if req.ModelName != nil {
@@ -125,7 +126,11 @@ func handleSettingsSet() nats.MsgHandler {
 		// core wouldn't pick up the change until restarted.
 		tools.SetWorkspaceRoot(cfg.WorkspaceRoot)
 
-		respond(msg, config.Mask(cfg))
+		reply := SettingsSetReply{AppConfig: config.Mask(cfg)}
+		if modelOrProviderChanged {
+			reply.Note = "modelName/provider are saved, but this running core process is still using the model it booted with -- restart the core for this change to actually take effect."
+		}
+		respond(msg, reply)
 	}
 }
 

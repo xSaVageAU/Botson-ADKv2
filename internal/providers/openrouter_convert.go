@@ -74,7 +74,27 @@ type chatUsage struct {
 }
 
 type chatAPIError struct {
-	Message string `json:"message"`
+	Message  string         `json:"message"`
+	Code     any            `json:"code"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+// describe renders an error for display, including whatever metadata
+// OpenRouter attached (e.g. "raw"/"provider_name" for an upstream
+// provider failure) -- OpenRouter's own top-level message is frequently
+// as generic as "Provider returned error", with the actually useful
+// detail only in metadata.
+func (e *chatAPIError) describe() string {
+	if e == nil || e.Message == "" {
+		return "unknown error"
+	}
+	if len(e.Metadata) == 0 {
+		return e.Message
+	}
+	if b, err := json.Marshal(e.Metadata); err == nil {
+		return fmt.Sprintf("%s (%s)", e.Message, string(b))
+	}
+	return e.Message
 }
 
 // --- request translation: model.LLMRequest (genai-shaped) -> chatCompletionRequest ---
@@ -202,12 +222,21 @@ func toTools(tools []*genai.Tool) []chatTool {
 			if fd == nil {
 				continue
 			}
+			// OpenAI-compatible APIs expect "parameters" to always be a
+			// valid JSON Schema object, even for a tool that takes no
+			// arguments -- omitting it entirely (which schemaToJSONSchema
+			// alone would do for a nil/argument-less Schema) is spec-
+			// incorrect and some backends behind OpenRouter reject it.
+			params := schemaToJSONSchema(fd.Parameters)
+			if params == nil {
+				params = map[string]any{"type": "object", "properties": map[string]any{}}
+			}
 			out = append(out, chatTool{
 				Type: "function",
 				Function: chatToolFunction{
 					Name:        fd.Name,
 					Description: fd.Description,
-					Parameters:  schemaToJSONSchema(fd.Parameters),
+					Parameters:  params,
 				},
 			})
 		}
@@ -247,6 +276,11 @@ func schemaToJSONSchema(s *genai.Schema) map[string]any {
 			props[name] = schemaToJSONSchema(prop)
 		}
 		out["properties"] = props
+	} else if strings.EqualFold(string(s.Type), "OBJECT") {
+		// An object schema with no properties still needs the key present
+		// -- see toTools' nil-Parameters comment, same spec-compliance
+		// reasoning applies to an object type with zero fields.
+		out["properties"] = map[string]any{}
 	}
 	return out
 }

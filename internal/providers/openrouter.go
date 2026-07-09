@@ -92,7 +92,7 @@ func (m *openRouterModel) generate(ctx context.Context, req *model.LLMRequest) (
 		return nil, fmt.Errorf("failed to parse OpenRouter response: %w", err)
 	}
 	if chatResp.Error != nil {
-		return nil, fmt.Errorf("OpenRouter error: %s", chatResp.Error.Message)
+		return nil, fmt.Errorf("OpenRouter error: %s", chatResp.Error.describe())
 	}
 
 	return fromChatResponse(&chatResp)
@@ -106,7 +106,7 @@ func describeOpenRouterError(body []byte) string {
 		Error *chatAPIError `json:"error"`
 	}
 	if err := json.Unmarshal(body, &withErr); err == nil && withErr.Error != nil && withErr.Error.Message != "" {
-		return withErr.Error.Message
+		return withErr.Error.describe()
 	}
 	if len(body) > 500 {
 		body = body[:500]

@@ -20,17 +20,27 @@ type UpdateSettingsArgs struct {
 }
 
 // UpdateSettingsResult echoes back the resulting configuration (secrets
-// masked) so the agent can confirm what actually changed.
+// masked) so the agent can confirm what actually changed. Note is set when
+// something was changed that this already-running process won't actually
+// pick up until it's restarted.
 type UpdateSettingsResult struct {
 	Updated config.AppConfig `json:"updated"`
+	Note    string           `json:"note,omitempty"`
 }
 
 // UpdateSettings lets the running agent change its own non-secret settings
 // mid-conversation. The change is written to disk immediately via
 // config.Update, which also mutates the shared in-memory config this
-// process is already holding (e.g. cmd/botson-core's appBoot.Config), so it
-// takes effect for the rest of this run without needing a restart.
+// process is already holding (e.g. cmd/botson-core's appBoot.Config).
+// RootAgent takes effect for the rest of this run. ModelName and Provider
+// do NOT -- the model.LLM this process talks to was already built once at
+// boot (see cmd/botson-core/bootstrap.go, internal/providers.New) and
+// isn't rebuilt on a settings change, so this process keeps using whatever
+// provider/model it started with until it's restarted, even though this
+// reply (and botson.settings.get) will show the new value.
 func UpdateSettings(ctx agent.Context, args UpdateSettingsArgs) (UpdateSettingsResult, error) {
+	modelOrProviderChanged := args.ModelName != "" || args.Provider != ""
+
 	cfg, err := config.Update(func(cfg *config.AppConfig) {
 		if args.ModelName != "" {
 			cfg.ModelName = args.ModelName
@@ -46,5 +56,9 @@ func UpdateSettings(ctx agent.Context, args UpdateSettingsArgs) (UpdateSettingsR
 		return UpdateSettingsResult{}, fmt.Errorf("failed to update settings: %w", err)
 	}
 
-	return UpdateSettingsResult{Updated: config.Mask(cfg)}, nil
+	result := UpdateSettingsResult{Updated: config.Mask(cfg)}
+	if modelOrProviderChanged {
+		result.Note = "modelName/provider are saved, but this running core process is still using the model it booted with -- restart the core (`botson core stop` then start it again) for this change to actually take effect."
+	}
+	return result, nil
 }

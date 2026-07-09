@@ -9,6 +9,8 @@
 // here is plain request/reply; none of it needs streaming.
 package natsapi
 
+import "botson/internal/config"
+
 const (
 	SubjectSettingsGet = "botson.settings.get"
 	SubjectSettingsSet = "botson.settings.set"
@@ -36,6 +38,17 @@ type SettingsSetRequest struct {
 	WorkspaceRoot    *string `json:"workspaceRoot,omitempty"`
 	Provider         *string `json:"provider,omitempty"`
 	OpenRouterAPIKey *string `json:"openRouterApiKey,omitempty"`
+}
+
+// SettingsSetReply is settings.set's reply: the same fields settings.get
+// returns (embedded, so they marshal at the top level), plus an optional
+// Note -- set when modelName/provider changed, since this already-running
+// core process won't actually use the new model until it's restarted (see
+// internal/tools/update_settings.go's UpdateSettings, which carries the
+// same warning for the agent-editable path).
+type SettingsSetReply struct {
+	config.AppConfig
+	Note string `json:"note,omitempty"`
 }
 
 // AgentsSaveRequest is the request payload for SubjectAgentsSave.

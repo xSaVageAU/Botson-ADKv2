@@ -179,7 +179,19 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 	defer nc.Close()
 
 	if !quiet {
+		provider := boot.Config.Provider
+		if provider == "" {
+			provider = "gemini"
+		}
 		fmt.Printf("Starting Botson's core on nats://127.0.0.1:%d (token-authenticated)... please do not close this window.\n", port)
+		// The model is built once, here at boot, from whatever provider/
+		// model/API key were in config.json at this moment -- a later
+		// settings change updates config.json and botson.settings.get's
+		// reply, but NOT this already-running process's model, until it's
+		// restarted. Printing the actually-active provider/model makes
+		// that mismatch obvious instead of a confusing wrong-provider
+		// error days later.
+		fmt.Printf("Provider: %s, model: %s\n", provider, boot.Config.ModelName)
 	}
 
 	proxy, err := adkproxy.New(adkproxy.Config{
