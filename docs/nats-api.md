@@ -23,7 +23,7 @@ nats://<host>:<port>
 
 `<port>` defaults to `4222` (`botson core --port=4222` / `core start
 --port=4222`). If you don't control how the core was started and need to
-discover its actual port, read `~/.botsonv2/core.pid` — it's a JSON file
+discover its actual port, read `~/.botson/core.pid` — it's a JSON file
 with a `meta.natsPort` field (see [process-architecture.md §4](./process-architecture.md#4-how-a-client-finds-or-announces-a-core)).
 In the common case (you're running your own core alongside your consumer,
 or you know the port because you configured it) you can skip this and just
@@ -187,7 +187,7 @@ using the rest of the reply.
 |---|---|---|
 | `botson.agents.list` | *(empty)* | `[{"name","description","is_root","private","tools":[...],"instructions","read_only"}, ...]` |
 | `botson.agents.tools` | *(empty)* | `{"standard":["listFiles","readFile",...], "agents":["Agent Botson",...]}` — valid values for an agent's `tools` list (built-in tools, plus any other agent name for sub-agent delegation) |
-| `botson.agents.save` | `{"name","description","tools":[...],"private","instructions"}` | `{}` on success. Creates or overwrites a custom agent under `~/.botsonv2/agents/<name>/`. If `name` collides with a bundled default agent, saves as a user override. |
+| `botson.agents.save` | `{"name","description","tools":[...],"private","instructions"}` | `{}` on success. Creates or overwrites a custom agent under `~/.botson/agents/<name>/`. If `name` collides with a bundled default agent, saves as a user override. |
 | `botson.agents.delete` | `{"name"}` | `{}` on success. Only affects custom user agents — bundled defaults can't be deleted. |
 
 ### Sessions (dashboard-shaped view)

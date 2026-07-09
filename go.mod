@@ -1,4 +1,4 @@
-module botsonv2
+module botson
 
 go 1.26.3
 

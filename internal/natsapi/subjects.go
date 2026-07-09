@@ -5,7 +5,7 @@
 // prefix (see cmd/botson-core/cmd_core.go). This package's subjects, all under
 // "botson.", cover settings, custom-agent CRUD, and session/dashboard
 // management -- the things every CLI subcommand used to do by touching
-// config.json/the session DB/~/.botsonv2/agents directly. Every subject
+// config.json/the session DB/~/.botson/agents directly. Every subject
 // here is plain request/reply; none of it needs streaming.
 package natsapi
 

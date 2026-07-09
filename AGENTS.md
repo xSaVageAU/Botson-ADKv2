@@ -13,7 +13,7 @@ Botson is a Go-based agent framework built on Google's **ADK v2**. As of 2026-07
 - **`/internal`**: main application packages.
   - **[`/agent`](./internal/agent/)**: custom recursive agent loader, default definitions, and tool registry.
   - **[`/artifact`](./internal/artifact/)**: local file system service for persistent artifacts.
-  - **[`/config`](./internal/config/)**: `AppConfig` struct, load/save/update, and data-dir lookups (`~/.botsonv2/`). `Load` caches a single shared instance per process and `Update` mutates it in place (see "Self-configuration" below) — this is the one package every settings-reading/writing code path ultimately goes through, so it can't import `internal/management`, `internal/agent`, or `internal/tools` without creating a cycle.
+  - **[`/config`](./internal/config/)**: `AppConfig` struct, load/save/update, and data-dir lookups (`~/.botson/`). `Load` caches a single shared instance per process and `Update` mutates it in place (see "Self-configuration" below) — this is the one package every settings-reading/writing code path ultimately goes through, so it can't import `internal/management`, `internal/agent`, or `internal/tools` without creating a cycle.
   - **[`/daemon`](./internal/daemon/)**: generic detach/control lifecycle (start/stop/status, PID files, the loopback control channel) for `core start`/`stop`/`status`.
   - **[`/setup`](./internal/setup/)**: backs `botson setup install` — the one local, direct-to-disk bootstrap step (Gemini API key, model, root agent), needed before any core or NATS server exists for a client to configure that over instead.
   - **[`/natsapi`](./internal/natsapi/)**: the server side of Botson's own NATS API — the `botson.*` subjects covering settings, custom-agent CRUD, and dashboard-shaped session listing/inspection. See `subjects.go` for the full subject table. The standard ADK surface (list-apps, sessions, running a turn, A2A) is a separate namespace, `adk.*`, fronted by an *imported* [`github.com/Savs-Agents/NATS-ADK-Proxy`](https://github.com/Savs-Agents/NATS-ADK-Proxy) — not implemented in this repo at all; see "Unified core architecture" below.
@@ -24,7 +24,7 @@ Botson is a Go-based agent framework built on Google's **ADK v2**. As of 2026-07
 
 ## Architecture / how it works
 
-1. **Registry loading**: default agents (bundled) and custom user agents (from `~/.botsonv2/agents/`) are parsed and built recursively, supporting tool configuration and sub-agent delegation.
+1. **Registry loading**: default agents (bundled) and custom user agents (from `~/.botson/agents/`) are parsed and built recursively, supporting tool configuration and sub-agent delegation.
 2. **Core hosting**: `botson core` runs an embedded NATS server (`nats-server/v2`, in-process, no external dependency) plus two subject namespaces on top of it — `adk.*` (imported NATS-ADK-Proxy) and `botson.*` (`internal/natsapi`). This is the one process that holds the agent registry, session service, and artifact service in memory.
 3. **Every consumer is a NATS client.** There is no in-process interface of any kind in this repo.
 
@@ -111,7 +111,7 @@ botson core start --port=4222   # detached background process with a PID-file-ba
 botson core status               # reads the state file + probes the control channel
 botson core stop [--force]      # graceful stop via control channel, or force-kill
 ```
-Logs: `~/.botsonv2/logs/core.log`. State: `~/.botsonv2/core.pid`. Since Windows has no signal-based graceful shutdown for an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this works identically on Linux. See [docs/process-architecture.md](./docs/process-architecture.md) for the full discovery/lifecycle mechanics.
+Logs: `~/.botson/logs/core.log`. State: `~/.botson/core.pid`. Since Windows has no signal-based graceful shutdown for an arbitrary detached process, `stop` talks to a small loopback control channel the background process opens instead — this works identically on Linux. See [docs/process-architecture.md](./docs/process-architecture.md) for the full discovery/lifecycle mechanics.
 
 ### Everything else is a NATS subject, not a CLI command
 
@@ -119,7 +119,7 @@ Settings, custom-agent CRUD, and session/dashboard management are all `botson.*`
 
 ## Configuration reference
 
-`~/.botsonv2/config.json`:
+`~/.botson/config.json`:
 ```json
 {
   "model_name": "gemini-3.1-flash-lite",

@@ -1,12 +1,12 @@
 # ADK Session Management & Data Architecture
 
-This document describes how sessions, states, and event logs are structured, stored, and managed in BotsonV2 and the underlying Agent Development Kit (ADK) framework.
+This document describes how sessions, states, and event logs are structured, stored, and managed in Botson and the underlying Agent Development Kit (ADK) framework.
 
 ---
 
 ## 1. Data Schema & Scoping
 
-All sessions are persisted in a GORM-managed SQLite database (`sessions.db` in `~/.botsonv2/`). The schema utilizes a composite primary key layout to isolate session histories.
+All sessions are persisted in a GORM-managed SQLite database (`sessions.db` in `~/.botson/`). The schema utilizes a composite primary key layout to isolate session histories.
 
 ### The Composite Key
 Every session is uniquely identified by three fields:

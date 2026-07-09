@@ -3,7 +3,7 @@ package management
 import (
 	"fmt"
 
-	"botsonv2/internal/config"
+	"botson/internal/config"
 )
 
 // GetMaskedConfig loads the application config and masks secret fields

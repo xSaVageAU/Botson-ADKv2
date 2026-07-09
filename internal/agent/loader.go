@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"botsonv2/internal/config"
+	"botson/internal/config"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -35,7 +35,7 @@ type LoadedAgent struct {
 	Private bool
 }
 
-// GetDataDir resolves the physical path to ~/.botsonv2/agents/ and ensures it exists.
+// GetDataDir resolves the physical path to ~/.botson/agents/ and ensures it exists.
 func GetDataDir() (string, error) {
 	baseDir, err := config.GetDataDir()
 	if err != nil {
@@ -162,7 +162,7 @@ func readConfigsFromFS(sysFS fs.FS, configs map[string]*AgentConfig, instruction
 	return nil
 }
 
-// LoadAllAgents loads embedded default agents and user agents from ~/.botsonv2/agents/
+// LoadAllAgents loads embedded default agents and user agents from ~/.botson/agents/
 func LoadAllAgents(embeddedFS fs.FS, model model.LLM) (adkagent.Loader, error) {
 	configs := make(map[string]*AgentConfig)
 	instructions := make(map[string]string)

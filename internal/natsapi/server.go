@@ -8,9 +8,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"google.golang.org/adk/v2/cmd/launcher"
 
-	"botsonv2/internal/agent"
-	"botsonv2/internal/config"
-	"botsonv2/internal/management"
+	"botson/internal/agent"
+	"botson/internal/config"
+	"botson/internal/management"
 )
 
 // Serve subscribes to every subject in this package, answering requests

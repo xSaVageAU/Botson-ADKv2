@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"botsonv2/internal/config"
+	"botson/internal/config"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/session"
 )

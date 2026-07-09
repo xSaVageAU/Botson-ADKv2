@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"botsonv2/internal/config"
+	"botson/internal/config"
 )
 
 // State is the metadata persisted for a backgrounded subcommand so a later

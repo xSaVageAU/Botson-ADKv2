@@ -93,9 +93,9 @@ way (§4).
 
 | Command | What it is | Does it hold state? | Discoverable by other processes? |
 |---|---|---|---|
-| `botson core` | The core. Embedded NATS server + `adk.*`/`botson.*` subject handlers. | Yes -- the only one that does. | Yes, via `~/.botsonv2/core.pid` (always, regardless of how it was launched). |
+| `botson core` | The core. Embedded NATS server + `adk.*`/`botson.*` subject handlers. | Yes -- the only one that does. | Yes, via `~/.botson/core.pid` (always, regardless of how it was launched). |
 | `botson core start` / `stop` / `status` | Lifecycle wrapper: launches `botson core` as a detached background process, or asks a running one to stop / reports on it. | No (separate short-lived CLI invocation). | N/A -- manages the discoverable state above. |
-| `botson setup install` | Writes `~/.botsonv2/config.json` (Gemini API key, model, root agent). The one thing that has to stay local/direct-to-disk, since it must work before any core or NATS server exists. | No. | No. |
+| `botson setup install` | Writes `~/.botson/config.json` (Gemini API key, model, root agent). The one thing that has to stay local/direct-to-disk, since it must work before any core or NATS server exists. | No. | No. |
 
 ---
 
@@ -103,9 +103,9 @@ way (§4).
 
 Discovery is entirely file-based, through `internal/daemon` -- deliberately
 simple: no network broadcast, no service registry, just a JSON file per
-named process under `~/.botsonv2/`.
+named process under `~/.botson/`.
 
-**State file** (`~/.botsonv2/core.pid`):
+**State file** (`~/.botson/core.pid`):
 ```json
 {
   "pid": 12345,
@@ -163,7 +163,7 @@ that connection (via `errgroup`) until `ctx` is cancelled:
 - `adkproxy.New(...).Run(ctx)` -- the imported NATS-ADK-Proxy, serving `adk.*`.
 - `natsapi.Serve(ctx, nc, boot.Launcher)` -- serving `botson.*`.
 
-Logs go to `~/.botsonv2/logs/core.log` when detached via `start`; a
+Logs go to `~/.botson/logs/core.log` when detached via `start`; a
 foreground run just prints to the current terminal.
 
 ---
@@ -191,7 +191,7 @@ Description=Botson core
 After=network.target
 
 [Service]
-ExecStart=/root/.botsonv2/bin/botson core --port 4222
+ExecStart=/root/.botson/bin/botson core --port 4222
 WorkingDirectory=/path/to/your/project
 Restart=on-failure
 User=youruser
@@ -262,7 +262,7 @@ seem like the more likely next places this design gets pushed on.
   full turn's events back at once rather than incrementally. Since
   streaming lives in the shared proxy package, Botson inherits it
   automatically whenever it lands there.
-- **No log rotation.** `~/.botsonv2/logs/core.log` grows forever for a
+- **No log rotation.** `~/.botson/logs/core.log` grows forever for a
   long-lived core; nothing truncates or rotates it.
 - **No standalone Discord/web project exists yet.** Botson's NATS API
   (`adk.*` + `botson.*`) is designed to support one, but building it is

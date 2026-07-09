@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"botsonv2/internal/agent"
-	coreartifact "botsonv2/internal/artifact"
-	"botsonv2/internal/config"
-	coresession "botsonv2/internal/session"
+	"botson/internal/agent"
+	coreartifact "botson/internal/artifact"
+	"botson/internal/config"
+	coresession "botson/internal/session"
 
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/model/gemini"

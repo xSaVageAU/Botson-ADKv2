@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"botsonv2/internal/tools"
+	"botson/internal/tools"
 	"sort"
 
 	"google.golang.org/adk/v2/tool"

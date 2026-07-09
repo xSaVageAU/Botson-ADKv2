@@ -12,7 +12,7 @@ import (
 var defaultAgentsFS embed.FS
 
 // LoadDefaultAgents initializes and returns the dynamic agent.Loader.
-// It loads both the embedded default agents and any custom agents in ~/.botsonv2/agents/.
+// It loads both the embedded default agents and any custom agents in ~/.botson/agents/.
 func LoadDefaultAgents(model model.LLM) (agent.Loader, error) {
 	subFS, err := fs.Sub(defaultAgentsFS, "default_agents")
 	if err != nil {

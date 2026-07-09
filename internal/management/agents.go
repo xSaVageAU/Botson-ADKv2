@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"botsonv2/internal/agent"
+	"botson/internal/agent"
 )
 
 var agentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_ -]+$`)
@@ -52,7 +52,7 @@ func ListTools() (map[string][]string, error) {
 }
 
 // SaveAgent validates and persists a custom agent's config.json and
-// instructions.md to ~/.botsonv2/agents/<name>/. If the name collides with a
+// instructions.md to ~/.botson/agents/<name>/. If the name collides with a
 // read-only default agent, it is saved as a user override instead.
 func SaveAgent(detail agent.AgentDetail) error {
 	detail.Name = strings.TrimSpace(detail.Name)

@@ -8,9 +8,9 @@ It can read and manage files, hold persistent conversations, and ask for approva
 
 - **One core, NATS-only** — `botson core` is the only process that ever holds the agent runtime; nothing about running Botson requires a specific frontend
 - **Standard ADK surface over NATS** — list-apps, sessions, running a turn, and A2A, fronted by an imported [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) under the `adk.` subject prefix, matching upstream ADK's own REST/A2A behavior exactly
-- **Botson-specific state over NATS too** — settings, custom-agent CRUD, and dashboard-shaped session listing, under the `botson.` subject prefix (`internal/natsapi`) — nothing requires touching `~/.botsonv2/` files directly
+- **Botson-specific state over NATS too** — settings, custom-agent CRUD, and dashboard-shaped session listing, under the `botson.` subject prefix (`internal/natsapi`) — nothing requires touching `~/.botson/` files directly
 - **Human-in-the-loop approvals** — sensitive tool calls pause for a yes/no confirmation
-- **Custom agents** — define your own agents and tool sets, saved under `~/.botsonv2/agents/`
+- **Custom agents** — define your own agents and tool sets, saved under `~/.botson/agents/`
 - **Background core** — runs detached, with `start`/`stop`/`status`, or under a real service supervisor (systemd, etc.)
 
 ## Getting started
@@ -27,7 +27,7 @@ This produces `bin/botson-<os>-<arch>`.
 ```bash
 ./bin/botson-linux-amd64 setup install
 ```
-An interactive wizard asks for your Gemini API key and root agent, and writes `~/.botsonv2/config.json`. This is the only step that isn't a NATS call — it has to run before any core exists for a client to configure that over.
+An interactive wizard asks for your Gemini API key and root agent, and writes `~/.botson/config.json`. This is the only step that isn't a NATS call — it has to run before any core exists for a client to configure that over.
 
 **3. Run the core**
 ```bash
@@ -37,7 +37,7 @@ From here, talk to it over NATS — see `internal/natsapi/subjects.go` for the `
 
 ## Configuration
 
-Settings live in `~/.botsonv2/config.json` — your Gemini API key, chosen model, and root agent. Change it via `setup install`, the `botson.settings.set` NATS subject, or (for everything but the API key) the agent's own `updateSettings` tool.
+Settings live in `~/.botson/config.json` — your Gemini API key, chosen model, and root agent. Change it via `setup install`, the `botson.settings.set` NATS subject, or (for everything but the API key) the agent's own `updateSettings` tool.
 
 ## Learn more
 

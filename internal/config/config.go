@@ -32,7 +32,7 @@ func Mask(cfg *AppConfig) AppConfig {
 	return masked
 }
 
-// GetConfigPath returns the absolute path to ~/.botsonv2/config.json
+// GetConfigPath returns the absolute path to ~/.botson/config.json
 func GetConfigPath() (string, error) {
 	dataDir, err := GetDataDir()
 	if err != nil {
@@ -55,7 +55,7 @@ var (
 )
 
 // Load returns this process's shared configuration, reading it from
-// ~/.botsonv2/config.json on the first call and returning the same cached
+// ~/.botson/config.json on the first call and returning the same cached
 // instance on every call after that. If the file does not exist yet, it's
 // bootstrapped with a default template.
 func Load() (*AppConfig, error) {
@@ -154,13 +154,13 @@ func Update(mutate func(cfg *AppConfig)) (*AppConfig, error) {
 	return cfg, nil
 }
 
-// GetDataDir resolves the physical path to ~/.botsonv2/ and ensures it exists.
+// GetDataDir resolves the physical path to ~/.botson/ and ensures it exists.
 func GetDataDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to find home directory: %w", err)
 	}
-	dataDir := filepath.Join(home, ".botsonv2")
+	dataDir := filepath.Join(home, ".botson")
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create data directory: %w", err)
 	}

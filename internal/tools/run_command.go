@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"botsonv2/internal/procutil"
+	"botson/internal/procutil"
 
 	"google.golang.org/adk/v2/agent"
 )

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"botsonv2/internal/setup"
+	"botson/internal/setup"
 
 	"github.com/spf13/cobra"
 )
 
 // newSetupCmd is the one local, direct-to-disk bootstrap step: writing
-// ~/.botsonv2/config.json (Gemini API key, above all) before any core or
+// ~/.botson/config.json (Gemini API key, above all) before any core or
 // NATS server exists for a client to configure that over. Everything else
 // about running Botson happens over NATS once a core is up -- see
 // internal/natsapi.

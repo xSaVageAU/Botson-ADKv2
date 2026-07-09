@@ -3,7 +3,7 @@ package tools
 import (
 	"fmt"
 
-	"botsonv2/internal/config"
+	"botson/internal/config"
 
 	"google.golang.org/adk/v2/agent"
 )

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"botsonv2/internal/daemon"
-	"botsonv2/internal/natsapi"
+	"botson/internal/daemon"
+	"botson/internal/natsapi"
 
 	adkproxy "github.com/Savs-Agents/NATS-ADK-Proxy"
 	"github.com/nats-io/nats-server/v2/server"

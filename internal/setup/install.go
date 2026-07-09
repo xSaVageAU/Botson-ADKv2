@@ -1,5 +1,5 @@
 // Package setup implements `botson setup install`: writing the initial
-// ~/.botsonv2/config.json a core needs before it can start (the Gemini API
+// ~/.botson/config.json a core needs before it can start (the Gemini API
 // key, above all -- there's no NATS server yet at this point for a client
 // to configure that over, so this one step has to stay a local,
 // direct-to-disk operation). Plain functions, no Cobra awareness, so
@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"botsonv2/internal/config"
-	"botsonv2/internal/management"
+	"botson/internal/config"
+	"botson/internal/management"
 )
 
 // InstallOptions carries flag-driven answers for a scripted
@@ -30,7 +30,7 @@ type InstallOptions struct {
 	RootAgent    string
 }
 
-// Install writes ~/.botsonv2/config.json: Gemini API key, then root agent.
+// Install writes ~/.botson/config.json: Gemini API key, then root agent.
 // With opts.NonInteractive, prompts are skipped entirely in favor of opts.
 func Install(ctx context.Context, opts InstallOptions) error {
 	fmt.Println("Botson Setup - Install")
