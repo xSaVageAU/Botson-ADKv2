@@ -1,17 +1,16 @@
 # Botson
 
-Botson is a personal AI agent console, built in Go on top of Google's **ADK v2** (Agent Development Kit) and the Gemini API. One binary gives you three ways to talk to your agent — a terminal chat client, a web dashboard, and a Discord bot — all backed by the same agents, sessions, and tools.
+Botson is a personal AI agent console, built in Go on top of Google's **ADK v2** (Agent Development Kit) and the Gemini API. One binary gives you a terminal chat client backed by a shared core process, which exposes its agents, sessions, and tools over a NATS API — so other consumers (a Discord bot, a web console) can be built as fully independent projects against that same API.
 
 It can read and manage files, hold persistent conversations, and ask for your approval before doing anything sensitive.
 
 ## Features
 
 - **Terminal chat (TUI)** — the default experience, just run `botson`
-- **Web console** — a dashboard for chatting, watching tool activity, and editing agent configs from a browser
-- **Discord bot** — talk to your agent from Discord, with a whitelist and per-user sessions
-- **Human-in-the-loop approvals** — sensitive tool calls pause for a yes/no confirmation, in the console or as a Discord DM
+- **A shared core** — one process holds the agent registry, session state, and Gemini model, exposed over an embedded NATS server so any client (this repo's TUI, or a separate project you build) can talk to it
+- **Human-in-the-loop approvals** — sensitive tool calls pause for a yes/no confirmation
 - **Custom agents** — define your own agents and tool sets, saved under `~/.botsonv2/agents/`
-- **Background services** — the web console and Discord bot can run detached, with `start`/`stop`/`status` and (on Windows) a system tray icon
+- **Background core** — the core can run detached, with `start`/`stop`/`status` and (on Windows) a system tray icon
 
 ## Getting started
 
@@ -21,7 +20,7 @@ You'll need a [Gemini API key](https://aistudio.google.com/apikey) and Go 1.26+ 
 ```bash
 go run scripts/build_linux.go     # or build_windows.go on Windows
 ```
-This produces `bin/botsonv2-<os>-<arch>` (plus the standalone `botsonv2-discord` and `botsonv2-adk` binaries).
+This produces `bin/botsonv2-<os>-<arch>`.
 
 **2. Install**
 ```bash
@@ -31,19 +30,18 @@ An interactive wizard asks for your Gemini API key and a few other basics, then 
 
 **3. Run**
 ```bash
-botson              # chat in your terminal (the default)
-botson web          # open the web console at localhost:8080
-botson discord      # run the Discord bot (needs a token, see below)
+botson              # chat in your terminal (the default) -- auto-starts a private core if none is running
+botson core start   # or start a shared, persistent core first, for any client to attach to
 ```
 
 Run `botson --help` any time to see everything available.
 
 ## Configuration
 
-Settings live in `~/.botsonv2/config.json` — your Gemini API key, chosen model, root agent, and (optional) Discord token. You can hand-edit this file, redo `setup install`, or change most of it from the web console's Settings tab.
+Settings live in `~/.botsonv2/config.json` — your Gemini API key, chosen model, and root agent. You can hand-edit this file, redo `setup install`, or change it via `botson settings set`.
 
 ## Learn more
 
 - **[AGENTS.md](./AGENTS.md)** — architecture, project layout, and the full CLI reference. Start here if you're contributing or maintaining the code (human or AI).
 - **[docs/sessions.md](./docs/sessions.md)** — how sessions, state, and history are stored.
-- **[docs/process-architecture.md](./docs/process-architecture.md)** — how Botson runs as one or more processes: the unified core, how clients discover it, and how the TUI/Discord/tray each fit in.
+- **[docs/process-architecture.md](./docs/process-architecture.md)** — how Botson runs as one or more processes: the unified core, how clients discover it, and how the TUI/tray each fit in.

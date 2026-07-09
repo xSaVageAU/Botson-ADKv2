@@ -5,10 +5,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"botsonv2/internal/interface/apiclient"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nats-io/nats-server/v2/server"
 )
 
 // TestMain starts a real, headless Bubble Tea program for the whole test
@@ -33,15 +35,33 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// unreachableClient points at a port nothing is listening on, so any
-// in-flight HTTP call a background goroutine makes fails fast rather than
-// hanging or actually reaching a real core.
-func unreachableClient() *apiclient.Client {
-	return apiclient.New("http://127.0.0.1:1")
+// unreachableClient connects to a bare embedded NATS server with no
+// natscore.Serve wired up to it, so any in-flight call a background
+// goroutine makes gets a fast "no responders" error rather than hanging or
+// actually reaching a real core.
+func unreachableClient(t *testing.T) *apiclient.Client {
+	t.Helper()
+
+	srv, err := server.NewServer(&server.Options{Host: "127.0.0.1", Port: -1})
+	if err != nil {
+		t.Fatalf("failed to start embedded NATS server: %v", err)
+	}
+	go srv.Start()
+	if !srv.ReadyForConnections(5 * time.Second) {
+		t.Fatal("embedded NATS server never became ready")
+	}
+	t.Cleanup(srv.Shutdown)
+
+	client, err := apiclient.New(srv.ClientURL())
+	if err != nil {
+		t.Fatalf("failed to connect client: %v", err)
+	}
+	t.Cleanup(client.Close)
+	return client
 }
 
 func TestUpdateHitlPendingMsgShowsPrompt(t *testing.T) {
-	m := model{client: unreachableClient(), agentName: "Agent Botson", sessionID: "sess-1"}
+	m := model{client: unreachableClient(t), agentName: "Agent Botson", sessionID: "sess-1"}
 
 	updated, _ := m.Update(hitlPendingMsg{callID: "call-1", toolName: "writeFile", hint: "writes a file"})
 	mm := updated.(model)
@@ -59,7 +79,7 @@ func TestUpdateHitlPendingMsgShowsPrompt(t *testing.T) {
 
 func TestApprovingClearsHitlAndResumes(t *testing.T) {
 	m := model{
-		client:      unreachableClient(),
+		client:      unreachableClient(t),
 		agentName:   "Agent Botson",
 		sessionID:   "sess-1",
 		pendingHITL: &hitlPendingMsg{callID: "call-1", toolName: "writeFile", hint: "writes a file"},
@@ -85,7 +105,7 @@ func TestApprovingClearsHitlAndResumes(t *testing.T) {
 
 func TestDenyingClearsHitlAndResumes(t *testing.T) {
 	m := model{
-		client:      unreachableClient(),
+		client:      unreachableClient(t),
 		agentName:   "Agent Botson",
 		sessionID:   "sess-1",
 		pendingHITL: &hitlPendingMsg{callID: "call-1", toolName: "writeFile", hint: "writes a file"},
@@ -113,7 +133,7 @@ func TestDenyingClearsHitlAndResumes(t *testing.T) {
 
 func TestTextInputIgnoredWhilePending(t *testing.T) {
 	m := model{
-		client:      unreachableClient(),
+		client:      unreachableClient(t),
 		agentName:   "Agent Botson",
 		sessionID:   "sess-1",
 		pendingHITL: &hitlPendingMsg{callID: "call-1", toolName: "writeFile"},

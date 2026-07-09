@@ -3,24 +3,93 @@ package apiclient
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
+	"iter"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/cmd/launcher"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
+
+	"botsonv2/internal/interface/natscore"
 )
 
-func TestDefaultAgent(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/botson/api/default-agent" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		fmt.Fprint(w, `{"name":"Agent Botson"}`)
-	}))
-	defer srv.Close()
+// newTestAgent builds a minimal agent.Agent driven by a hand-written Run
+// function instead of a real Gemini model, so these tests exercise the
+// wire protocol without needing an API key.
+func newTestAgent(t *testing.T, name string, run func(agent.InvocationContext) iter.Seq2[*session.Event, error]) agent.Agent {
+	t.Helper()
+	a, err := agent.New(agent.Config{Name: name, Run: run})
+	if err != nil {
+		t.Fatalf("failed to build test agent: %v", err)
+	}
+	return a
+}
 
-	name, err := New(srv.URL).DefaultAgent(context.Background())
+// startTestServer starts a bare embedded NATS server on an ephemeral
+// loopback port with nothing subscribed yet, returning its client URL.
+func startTestServer(t *testing.T) string {
+	t.Helper()
+
+	srv, err := server.NewServer(&server.Options{Host: "127.0.0.1", Port: -1})
+	if err != nil {
+		t.Fatalf("failed to start embedded NATS server: %v", err)
+	}
+	go srv.Start()
+	if !srv.ReadyForConnections(5 * time.Second) {
+		t.Fatal("embedded NATS server never became ready")
+	}
+	t.Cleanup(srv.Shutdown)
+	return srv.ClientURL()
+}
+
+// newTestClient starts an embedded NATS server, wires natscore.Serve to it
+// using cfg, and returns a Client connected to the same server -- the test
+// equivalent of a running `botson core` plus a TUI pointed at it.
+func newTestClient(t *testing.T, cfg *launcher.Config) *Client {
+	t.Helper()
+
+	url := startTestServer(t)
+
+	serverConn, err := nats.Connect(url)
+	if err != nil {
+		t.Fatalf("failed to connect core-side NATS conn: %v", err)
+	}
+	t.Cleanup(serverConn.Close)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go natscore.Serve(ctx, serverConn, cfg)
+
+	client, err := New(url)
+	if err != nil {
+		t.Fatalf("failed to connect client: %v", err)
+	}
+	t.Cleanup(client.Close)
+	return client
+}
+
+func textEvent(author, text string) *session.Event {
+	return &session.Event{
+		Author:      author,
+		LLMResponse: model.LLMResponse{Content: &genai.Content{Role: "model", Parts: []*genai.Part{{Text: text}}}},
+	}
+}
+
+func TestDefaultAgent(t *testing.T) {
+	root := newTestAgent(t, "Agent Botson", nil)
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
+
+	name, err := client.DefaultAgent(t.Context())
 	if err != nil {
 		t.Fatalf("DefaultAgent failed: %v", err)
 	}
@@ -30,72 +99,74 @@ func TestDefaultAgent(t *testing.T) {
 }
 
 func TestCreateSession(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := "/api/apps/Agent%20Botson/users/tui/sessions"
-		if r.URL.EscapedPath() != wantPath {
-			t.Fatalf("expected path %q, got %q", wantPath, r.URL.EscapedPath())
-		}
-		fmt.Fprint(w, `{"id":"generated-id-123"}`)
-	}))
-	defer srv.Close()
+	root := newTestAgent(t, "Agent Botson", nil)
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
 
-	id, err := New(srv.URL).CreateSession(context.Background(), "Agent Botson", "tui", "", nil)
+	id, err := client.CreateSession(t.Context(), "Agent Botson", "tui", "", nil)
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
-	if id != "generated-id-123" {
-		t.Fatalf("expected server-generated id, got %q", id)
+	if id == "" {
+		t.Fatal("expected a server-generated id, got an empty string")
 	}
 }
 
 func TestGetSession(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := "/api/apps/Agent%20Botson/users/tui/sessions/sess-1"
-		if r.URL.EscapedPath() != wantPath {
-			t.Fatalf("expected path %q, got %q", wantPath, r.URL.EscapedPath())
-		}
-		fmt.Fprint(w, `{"events":[{"author":"user","content":{"role":"user","parts":[{"text":"hi"}]}}],"state":{"k":"v"}}`)
-	}))
-	defer srv.Close()
+	root := newTestAgent(t, "Agent Botson", nil)
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
 
-	info, err := New(srv.URL).GetSession(context.Background(), "Agent Botson", "tui", "sess-1")
+	id, err := client.CreateSession(t.Context(), "Agent Botson", "tui", "sess-1", map[string]any{"k": "v"})
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	info, err := client.GetSession(t.Context(), "Agent Botson", "tui", id)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
-	}
-	if len(info.Events) != 1 || info.Events[0].Author != "user" {
-		t.Fatalf("unexpected events: %+v", info.Events)
 	}
 	if info.State["k"] != "v" {
 		t.Fatalf("unexpected state: %+v", info.State)
 	}
 }
 
-func TestGetSessionNonOKStatusIsAnError(t *testing.T) {
-	// ADK's own handler returns 500, not 404, for "no such session" --
-	// GetSession must still surface it as an error either way.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "session not found", http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+func TestGetSessionMissingIsAnError(t *testing.T) {
+	root := newTestAgent(t, "Agent Botson", nil)
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
 
-	if _, err := New(srv.URL).GetSession(context.Background(), "Agent Botson", "tui", "missing"); err == nil {
-		t.Fatal("expected an error for a non-200 response, got none")
+	if _, err := client.GetSession(t.Context(), "Agent Botson", "tui", "missing"); err == nil {
+		t.Fatal("expected an error for a nonexistent session, got none")
 	}
 }
 
 func TestRunStreamsEvents(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/run_sse" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
+	root := newTestAgent(t, "Agent Botson", func(agent.InvocationContext) iter.Seq2[*session.Event, error] {
+		return func(yield func(*session.Event, error) bool) {
+			if !yield(textEvent("Agent Botson", "hello"), nil) {
+				return
+			}
+			yield(textEvent("Agent Botson", " world"), nil)
 		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, `data: {"author":"Agent Botson","content":{"role":"model","parts":[{"text":"hello"}]}}`+"\n")
-		fmt.Fprint(w, `data: {"author":"Agent Botson","content":{"role":"model","parts":[{"text":" world"}]}}`+"\n")
-	}))
-	defer srv.Close()
+	})
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
 
 	var texts []string
-	for ev, err := range New(srv.URL).Run(context.Background(), "Agent Botson", "tui", "sess-1", &genai.Content{Role: "user", Parts: []*genai.Part{{Text: "hi"}}}) {
+	for ev, err := range client.Run(t.Context(), "Agent Botson", "tui", "sess-1", &genai.Content{Role: "user", Parts: []*genai.Part{{Text: "hi"}}}) {
 		if err != nil {
 			t.Fatalf("Run yielded an error: %v", err)
 		}
@@ -116,39 +187,44 @@ func TestRunStreamsEvents(t *testing.T) {
 }
 
 func TestRunSurfacesMidStreamErrorNotSilentTruncation(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, `data: {"author":"Agent Botson","content":{"role":"model","parts":[{"text":"partial"}]}}`+"\n")
-		// Malformed JSON simulates a broken/truncated frame -- this must
-		// surface as an error through the iterator, not be silently
-		// dropped (which would look identical to a clean end of stream).
-		fmt.Fprint(w, `data: {not valid json`+"\n")
-	}))
-	defer srv.Close()
+	root := newTestAgent(t, "Agent Botson", func(agent.InvocationContext) iter.Seq2[*session.Event, error] {
+		return func(yield func(*session.Event, error) bool) {
+			if !yield(textEvent("Agent Botson", "partial"), nil) {
+				return
+			}
+			yield(nil, fmt.Errorf("boom"))
+		}
+	})
+	cfg := &launcher.Config{
+		AgentLoader:    agent.NewSingleLoader(root),
+		SessionService: session.InMemoryService(),
+	}
+	client := newTestClient(t, cfg)
 
 	var sawError bool
-	for _, err := range New(srv.URL).Run(context.Background(), "Agent Botson", "tui", "sess-1", &genai.Content{}) {
+	for _, err := range client.Run(t.Context(), "Agent Botson", "tui", "sess-1", &genai.Content{Role: "user", Parts: []*genai.Part{{Text: "hi"}}}) {
 		if err != nil {
 			sawError = true
 		}
 	}
 	if !sawError {
-		t.Fatal("expected a malformed SSE frame to surface as an error, got none")
+		t.Fatal("expected a mid-stream agent error to surface as an error, got none")
 	}
 }
 
-func TestRunNonOKStatusIsAnError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "no such app", http.StatusNotFound)
-	}))
-	defer srv.Close()
+func TestRunNoResponderIsAnError(t *testing.T) {
+	// No natscore.Serve running at all -- nothing is subscribed to
+	// SubjectRun, matching "the core isn't running".
+	url := startTestServer(t)
+	client, err := New(url)
+	if err != nil {
+		t.Fatalf("failed to connect client: %v", err)
+	}
+	t.Cleanup(client.Close)
 
-	for _, err := range New(srv.URL).Run(context.Background(), "Nonexistent", "tui", "sess-1", &genai.Content{}) {
+	for _, err := range client.Run(t.Context(), "Nonexistent", "tui", "sess-1", &genai.Content{}) {
 		if err == nil {
-			t.Fatal("expected an error for a non-200 response, got none")
-		}
-		if !strings.Contains(err.Error(), "404") {
-			t.Fatalf("expected the error to mention the status, got: %v", err)
+			t.Fatal("expected an error when nothing is listening on SubjectRun, got none")
 		}
 	}
 }

@@ -14,9 +14,8 @@ import (
 // by rootCmd's PersistentPreRunE before any subcommand's RunE executes.
 var boot *appBoot
 
-// agentFlag is shared between the root command (bare `botson`, which runs
-// whichever subcommand config.AppConfig.DefaultCommand names) and the
-// explicit `tui` subcommand.
+// agentFlag is shared between the root command (bare `botson`, which
+// always runs the TUI) and the explicit `tui` subcommand.
 var agentFlag string
 
 // resumeSessionFlag reattaches the TUI to an existing session instead of
@@ -31,15 +30,20 @@ var resumeSessionFlag string
 // of those needs this to not be hardcoded the same way.
 var resumeUserFlag string
 
+// noBootstrap skips the root command's expensive config/Gemini/agent/session
+// bootstrap for subcommands that only manage a background process's
+// lifecycle and never touch the agent runtime themselves.
+func noBootstrap(cmd *cobra.Command, args []string) error { return nil }
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	rootCmd := &cobra.Command{
 		Use:   "botson",
-		Short: "Botson: multi-purpose AI agent console",
-		Long: "Botson combines a terminal chat client, a web console, and a Discord\n" +
-			"gateway in one binary. Run with no arguments to start a chat session.",
+		Short: "Botson: an AI agent console",
+		Long: "Botson is a terminal chat client (this binary) backed by a shared\n" +
+			"core that speaks NATS -- run with no arguments to start a chat session.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -51,32 +55,17 @@ func main() {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDefaultCommand(cmd.Context())
+			return runTUI(cmd.Context(), agentFlag, resumeSessionFlag, resumeUserFlag)
 		},
 	}
 	rootCmd.PersistentFlags().StringVar(&agentFlag, "agent", "", "Agent name to chat with (defaults to the configured root agent)")
 	rootCmd.PersistentFlags().StringVar(&resumeSessionFlag, "session", "", "Resume an existing chat session by ID instead of starting a new one (see `botson sessions list`)")
 	rootCmd.PersistentFlags().StringVar(&resumeUserFlag, "user", "tui", "User ID a --session lookup is made under (only relevant with --session; e.g. \"web\" for a session started in the web console)")
 
-	rootCmd.AddCommand(newTUICmd(), newWebCmd(), newDiscordCmd(), newTrayCmd(), newSetupCmd(), newSettingsCmd(), newAgentsCmd(), newScriptCmd(), newSessionsCmd())
+	rootCmd.AddCommand(newTUICmd(), newCoreCmd(), newTrayCmd(), newSetupCmd(), newSettingsCmd(), newAgentsCmd(), newScriptCmd(), newSessionsCmd())
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
-	}
-}
-
-// runDefaultCommand runs whichever interface config.AppConfig.DefaultCommand
-// names when `botson` is invoked with no subcommand. Empty/unrecognized
-// values fall back to the TUI, so existing installs (and configs predating
-// this field) behave exactly as before.
-func runDefaultCommand(ctx context.Context) error {
-	switch boot.Config.DefaultCommand {
-	case "web":
-		return runWeb(ctx, 8080, false)
-	case "discord":
-		return runDiscord(ctx)
-	default:
-		return runTUI(ctx, agentFlag, resumeSessionFlag, resumeUserFlag)
 	}
 }

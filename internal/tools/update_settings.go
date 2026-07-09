@@ -11,12 +11,11 @@ import (
 // UpdateSettingsArgs defines the input arguments for the Update Settings
 // tool. Every field is optional; only the ones set (non-empty) are
 // changed, everything else is left as-is. Deliberately excludes secrets
-// (Gemini API key, Discord token/owner) -- those stay human-controlled via
-// `botson settings set` or the web console, not agent-editable.
+// (the Gemini API key) -- those stay human-controlled via `botson settings
+// set`, not agent-editable.
 type UpdateSettingsArgs struct {
-	ModelName      string `json:"modelName,omitempty" jsonschema:"The Gemini model to use (e.g. 'gemini-3.1-flash-lite'). Leave empty to keep the current model."`
-	RootAgent      string `json:"rootAgent,omitempty" jsonschema:"Name of the agent that runs by default. Leave empty to keep the current root agent."`
-	DefaultCommand string `json:"defaultCommand,omitempty" jsonschema:"What a bare 'botson' with no arguments runs: 'tui', 'web', or 'discord'. Leave empty to keep the current setting."`
+	ModelName string `json:"modelName,omitempty" jsonschema:"The Gemini model to use (e.g. 'gemini-3.1-flash-lite'). Leave empty to keep the current model."`
+	RootAgent string `json:"rootAgent,omitempty" jsonschema:"Name of the agent that runs by default. Leave empty to keep the current root agent."`
 }
 
 // UpdateSettingsResult echoes back the resulting configuration (secrets
@@ -31,23 +30,12 @@ type UpdateSettingsResult struct {
 // process is already holding (e.g. cmd/botson's appBoot.Config), so it
 // takes effect for the rest of this run without needing a restart.
 func UpdateSettings(ctx agent.Context, args UpdateSettingsArgs) (UpdateSettingsResult, error) {
-	if args.DefaultCommand != "" {
-		switch args.DefaultCommand {
-		case "tui", "web", "discord":
-		default:
-			return UpdateSettingsResult{}, fmt.Errorf("defaultCommand must be one of: tui, web, discord (got %q)", args.DefaultCommand)
-		}
-	}
-
 	cfg, err := config.Update(func(cfg *config.AppConfig) {
 		if args.ModelName != "" {
 			cfg.ModelName = args.ModelName
 		}
 		if args.RootAgent != "" {
 			cfg.RootAgent = args.RootAgent
-		}
-		if args.DefaultCommand != "" {
-			cfg.DefaultCommand = args.DefaultCommand
 		}
 	})
 	if err != nil {

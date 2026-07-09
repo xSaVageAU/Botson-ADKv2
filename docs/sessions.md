@@ -50,23 +50,23 @@ Each event records:
 
 ---
 
-## 4. REST API Endpoint Reference
+## 4. NATS API Subject Reference
 
-The unified backend on port `8080` exposes the following endpoints for session management:
+The core (`botson core`, an embedded NATS server) exposes the following subjects for session management (`internal/interface/natscore`):
 
 ### Create Session
-- **Endpoint:** `POST /api/apps/{app_name}/users/{user_id}/sessions`
-- **Body:** `{ "state": {}, "events": [] }`
-- **Behavior:** Creates a new session record on the backend. Generates a standard UUID and returns the session object.
+- **Subject:** `botson.session.create`
+- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "...", "state": {} }`
+- **Behavior:** Creates a new session record on the backend. If `sessionId` is empty, generates a standard UUID and returns it.
 
 ### Get Session Details
-- **Endpoint:** `GET /api/apps/{app_name}/users/{user_id}/sessions/{session_id}`
+- **Subject:** `botson.session.get`
+- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "..." }`
 - **Behavior:** Returns the session state and all chronological history events.
 
-### List Sessions
-- **Endpoint:** `GET /api/apps/{app_name}/users/{user_id}/sessions`
-- **Behavior:** Returns an array of all sessions (including states and update times) registered under the given agent and user ID.
+### Run (streaming)
+- **Subject:** `botson.run`
+- **Request:** `{ "appName": "...", "userId": "...", "sessionId": "...", "newMessage": <genai.Content> }`, published with a caller-generated reply inbox.
+- **Behavior:** Streams one `Frame{event: ...}` per session event to the reply inbox, terminated by exactly one final `Frame{done: true}` or `Frame{error: "..."}`.
 
-### Delete Session
-- **Endpoint:** `DELETE /api/apps/{app_name}/users/{user_id}/sessions/{session_id}`
-- **Behavior:** Atomically deletes the session record and cascades deletion to all associated event records in GORM.
+List and delete aren't exposed over NATS today -- `botson sessions list/show/delete` read the session database directly instead (see [AGENTS.md](../AGENTS.md)'s "Sessions" CLI reference), so they work even without a core running.

@@ -19,31 +19,24 @@ import (
 // `setup install` without a terminal attached for prompts. Any field left
 // at its zero value is treated as "not answered" and falls back to
 // whatever's already in the config (or the built-in default for a
-// brand-new one) instead of prompting for it. Discord/tray fields are
-// pointers so "not passed" (nil) can be told apart from an explicit
-// false, which is needed to leave existing Discord config untouched by
-// default rather than silently clearing it.
+// brand-new one) instead of prompting for it. Tray fields are pointers so
+// "not passed" (nil) can be told apart from an explicit false.
 type InstallOptions struct {
 	NonInteractive bool
 
-	GeminiAPIKey   string
-	ModelName      string
-	RootAgent      string
-	DefaultCommand string
-
-	Discord        *bool
-	DiscordToken   string
-	DiscordOwnerID string
+	GeminiAPIKey string
+	ModelName    string
+	RootAgent    string
 
 	RegisterTrayAutostart *bool
 	StartTrayNow          *bool
 }
 
-// Install walks a user through first-time setup: Gemini API key, root
-// agent, optional Discord integration, then copies the binary to its
-// stable install location, adds it to PATH, and (Windows only) offers to
-// register the tray icon to start at login. With opts.NonInteractive, the
-// prompts are skipped entirely in favor of opts.
+// Install walks a user through first-time setup: Gemini API key, then root
+// agent, then copies the binary to its stable install location, adds it to
+// PATH, and (Windows only) offers to register the tray icon to start at
+// login. With opts.NonInteractive, the prompts are skipped entirely in
+// favor of opts.
 func Install(ctx context.Context, opts InstallOptions) error {
 	fmt.Println("Botson Setup - Install")
 	fmt.Println("======================")
@@ -175,32 +168,6 @@ func applyInstallOptions(cfg *config.AppConfig, opts InstallOptions) error {
 		cfg.RootAgent = "Agent Botson"
 	}
 
-	if opts.DefaultCommand != "" {
-		switch opts.DefaultCommand {
-		case "tui", "web", "discord":
-			cfg.DefaultCommand = opts.DefaultCommand
-		default:
-			return fmt.Errorf("--default-command must be one of: tui, web, discord (got %q)", opts.DefaultCommand)
-		}
-	}
-
-	if opts.Discord != nil {
-		if *opts.Discord {
-			if opts.DiscordToken != "" {
-				cfg.Discord.Token = opts.DiscordToken
-			}
-			if cfg.Discord.Token == "" {
-				return fmt.Errorf("discord integration enabled but no token available: pass --discord-token")
-			}
-			if opts.DiscordOwnerID != "" {
-				cfg.Discord.OwnerID = opts.DiscordOwnerID
-			}
-		} else {
-			cfg.Discord.Token = ""
-			cfg.Discord.OwnerID = ""
-		}
-	}
-
 	return nil
 }
 
@@ -299,59 +266,6 @@ func promptRootAgent(cfg *config.AppConfig) error {
 	return nil
 }
 
-// promptDiscordSettings asks for Discord integration, skippable entirely.
-func promptDiscordSettings(cfg *config.AppConfig) error {
-	want, err := AskYesNo("Configure Discord integration now?", cfg.Discord.Token != "")
-	if err != nil {
-		return err
-	}
-	if !want {
-		cfg.Discord.Token = ""
-		cfg.Discord.OwnerID = ""
-		return nil
-	}
-
-	token, err := ReadMasked("Discord bot token")
-	if err != nil {
-		return err
-	}
-	cfg.Discord.Token = token
-
-	ownerID, err := ReadLine("Discord owner user ID", cfg.Discord.OwnerID)
-	if err != nil {
-		return err
-	}
-	cfg.Discord.OwnerID = ownerID
-	return nil
-}
-
-// promptDefaultCommand asks which subcommand a bare `botson` (no
-// subcommand) should run -- see config.AppConfig.DefaultCommand.
-func promptDefaultCommand(cfg *config.AppConfig) error {
-	def := cfg.DefaultCommand
-	if def == "" {
-		def = "tui"
-	}
-
-	fmt.Println("What should a bare `botson` (no subcommand) run?")
-	fmt.Println("  tui     - interactive terminal chat (default)")
-	fmt.Println("  web     - the web console, REST/A2A APIs, and Discord")
-	fmt.Println("  discord - the Discord bot only, foreground")
-
-	choice, err := ReadLine("Default command", def)
-	if err != nil {
-		return err
-	}
-
-	switch choice {
-	case "tui", "web", "discord":
-		cfg.DefaultCommand = choice
-	default:
-		return fmt.Errorf("default command must be one of: tui, web, discord (got %q)", choice)
-	}
-	return nil
-}
-
 // runConfigWizard runs the full set of prompts in order; Reset reuses the
 // individual prompt* functions directly for whichever categories aren't
 // kept, rather than calling this.
@@ -360,12 +274,6 @@ func runConfigWizard(cfg *config.AppConfig) error {
 		return err
 	}
 	if err := promptRootAgent(cfg); err != nil {
-		return err
-	}
-	if err := promptDiscordSettings(cfg); err != nil {
-		return err
-	}
-	if err := promptDefaultCommand(cfg); err != nil {
 		return err
 	}
 	return nil

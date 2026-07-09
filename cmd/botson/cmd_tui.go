@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"strconv"
 	"time"
@@ -44,12 +42,16 @@ func newTUICmd() *cobra.Command {
 // always uses "web"). The session's prior turns are replayed into the
 // transcript so the conversation reads as if it never stopped.
 func runTUI(ctx context.Context, agentName, resumeSessionID, resumeUserID string) error {
-	apiPort, err := ensureCoreRunning(ctx)
+	natsPort, err := ensureCoreRunning(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to reach Botson's core: %w", err)
 	}
 
-	client := apiclient.New(fmt.Sprintf("http://127.0.0.1:%d", apiPort))
+	client, err := apiclient.New(fmt.Sprintf("nats://127.0.0.1:%d", natsPort))
+	if err != nil {
+		return fmt.Errorf("failed to reach Botson's core: %w", err)
+	}
+	defer client.Close()
 
 	targetAgentName := agentName
 	if targetAgentName == "" {
@@ -83,43 +85,43 @@ func runTUI(ctx context.Context, agentName, resumeSessionID, resumeUserID string
 }
 
 // ensureCoreRunning finds a Botson core for the TUI to talk to, preferring
-// a real, discoverable one (`botson web`, `web start`, or one managed by
-// an external supervisor like systemd -- anything that calls runWeb, which
+// a real, discoverable one (`botson core`, `core start`, or one managed by
+// an external supervisor like systemd -- anything that calls runCore, which
 // always registers itself) if one is already running. Only if none is
 // found does it fall back to a private, in-process core scoped to this
 // TUI's own lifetime (see startEmbeddedCore) -- deliberately NOT a
 // detached background daemon, since a bare `botson`/`botson tui` silently
 // leaving a persistent background process running is exactly the surprise
-// this is meant to avoid. Anyone who wants Discord/web actually running in
-// the background sets that up explicitly (`web start`, a systemd unit,
-// etc.), never as a side effect of opening the TUI.
+// this is meant to avoid. Anyone who wants a core actually running in the
+// background sets that up explicitly (`core start`, a systemd unit, etc.),
+// never as a side effect of opening the TUI.
 func ensureCoreRunning(ctx context.Context) (int, error) {
-	status, _ := daemon.GetStatus(webDaemonName, webDisplayName)
+	status, _ := daemon.GetStatus(coreDaemonName, coreDisplayName)
 	if status.Running {
-		if p, ok := status.Meta["apiPort"]; ok {
+		if p, ok := status.Meta["natsPort"]; ok {
 			if port, err := strconv.Atoi(p); err == nil {
 				return port, nil
 			}
 		}
-		return 8080, nil
+		return 4222, nil
 	}
 
 	if noAutoStartCore {
-		return 0, fmt.Errorf("Botson's core isn't running and --no-auto-start was set; run `botson web start` first")
+		return 0, fmt.Errorf("Botson's core isn't running and --no-auto-start was set; run `botson core start` first")
 	}
 
 	return startEmbeddedCore(ctx)
 }
 
-// startEmbeddedCore runs a full core (REST/A2A APIs, Discord toggle
-// wiring) inside this same TUI process on an ephemeral loopback port, for
-// this process's exclusive use. Unlike runWeb, it never calls
-// daemon.WriteState -- nothing else can discover or stop it, and it
-// disappears the instant this process exits, leaving nothing running in
-// the background. It performs its own bootstrap (setupApp) if the TUI
-// subcommand's own PersistentPreRunE skipped it (see noBootstrap) --
-// becoming self-sufficient is exactly the right fallback when there's no
-// shared core to be a thin client of.
+// startEmbeddedCore runs a full core (the embedded NATS server plus
+// internal/interface/natscore's subject handlers) inside this same TUI
+// process on an ephemeral loopback port, for this process's exclusive use.
+// Unlike runCore, it never calls daemon.WriteState -- nothing else can
+// discover or stop it, and it disappears the instant this process exits,
+// leaving nothing running in the background. It performs its own
+// bootstrap (setupApp) if the TUI subcommand's own PersistentPreRunE
+// skipped it (see noBootstrap) -- becoming self-sufficient is exactly the
+// right fallback when there's no shared core to be a thin client of.
 func startEmbeddedCore(ctx context.Context) (int, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -138,14 +140,9 @@ func startEmbeddedCore(ctx context.Context) (int, error) {
 		boot = b
 	}
 
-	// runCoreServer (and libraries it drives) log via the stdlib `log`
-	// package; left alone, that output would land mid-frame in the TUI's
-	// alt-screen and corrupt the display.
-	log.SetOutput(io.Discard)
-
 	failed := make(chan error, 1)
 	go func() {
-		failed <- runCoreServer(ctx, port, false, true)
+		failed <- runCoreServer(ctx, port, true)
 	}()
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)

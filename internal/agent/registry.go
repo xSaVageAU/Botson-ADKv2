@@ -39,7 +39,7 @@ var availableTools = map[string]toolBuilder{
 	"updateSettings": func() (tool.Tool, error) {
 		return functiontool.New(functiontool.Config{
 			Name:                "updateSettings",
-			Description:         "Changes Botson's own non-secret settings (Gemini model, root agent, default command) and persists them immediately. Cannot touch API keys or Discord credentials.",
+			Description:         "Changes Botson's own non-secret settings (Gemini model, root agent) and persists them immediately. Cannot touch API keys.",
 			RequireConfirmation: true,
 		}, tools.UpdateSettings)
 	},
@@ -77,13 +77,6 @@ var availableTools = map[string]toolBuilder{
 			Description:         "Runs a previously saved script by name (see saveScript or `botson script list`) and returns its stdout, stderr, and exit code.",
 			RequireConfirmation: true,
 		}, tools.RunScript)
-	},
-	"toggleDiscord": func() (tool.Tool, error) {
-		return functiontool.New(functiontool.Config{
-			Name:                "toggleDiscord",
-			Description:         "Starts or stops Botson's Discord gateway. action must be 'start' or 'stop'. Requires a Discord bot token to already be configured.",
-			RequireConfirmation: true,
-		}, tools.ToggleDiscord)
 	},
 }
 

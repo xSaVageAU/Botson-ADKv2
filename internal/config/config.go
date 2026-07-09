@@ -10,16 +10,9 @@ import (
 
 // AppConfig holds the application configuration.
 type AppConfig struct {
-	ModelName    string        `json:"model_name"`
-	GeminiAPIKey string        `json:"gemini_api_key"`
-	RootAgent    string        `json:"root_agent"`
-	Discord      DiscordConfig `json:"discord"`
-
-	// DefaultCommand is which subcommand a bare `botson` (no args) runs --
-	// "tui", "web", or "discord". Settable via `botson setup install`,
-	// `botson settings set --default-command`, or the updateSettings agent
-	// tool. Empty means "tui".
-	DefaultCommand string `json:"default_command"`
+	ModelName    string `json:"model_name"`
+	GeminiAPIKey string `json:"gemini_api_key"`
+	RootAgent    string `json:"root_agent"`
 
 	// WorkspaceDir is the directory background/detached processes (tray,
 	// and anything tray itself spawns) operate in when they have no
@@ -27,9 +20,9 @@ type AppConfig struct {
 	// launched via a login-time autostart entry. Set once by `setup
 	// install` (defaulting to wherever install was run from) or `botson
 	// settings set`. Processes launched directly from a terminal (`botson
-	// web start`, `botson discord start`) instead use their own actual
-	// cwd and ignore this field entirely -- it exists only for the cases
-	// that have no real cwd to fall back on.
+	// core start`) instead use their own actual cwd and ignore this field
+	// entirely -- it exists only for the cases that have no real cwd to
+	// fall back on.
 	WorkspaceDir string `json:"workspace_dir,omitempty"`
 }
 
@@ -38,30 +31,16 @@ type AppConfig struct {
 // existing value" when they see it come back in a request.
 const MaskedSecret = "******"
 
-// Mask returns a copy of cfg with secret fields (Gemini API key, Discord
-// token) replaced by MaskedSecret, so it's safe to hand to a UI or an
-// agent tool. Lives here rather than in internal/management so internal/tools can
-// use it too without an import cycle (tools -> management -> agent ->
-// tools).
+// Mask returns a copy of cfg with secret fields (the Gemini API key)
+// replaced by MaskedSecret, so it's safe to hand to a UI or an agent tool.
+// Lives here rather than in internal/management so internal/tools can use
+// it too without an import cycle (tools -> management -> agent -> tools).
 func Mask(cfg *AppConfig) AppConfig {
 	masked := *cfg
 	if masked.GeminiAPIKey != "" {
 		masked.GeminiAPIKey = MaskedSecret
 	}
-	if masked.Discord.Token != "" {
-		masked.Discord.Token = MaskedSecret
-	}
 	return masked
-}
-
-// DiscordConfig holds parameters for the Discord gateway integration.
-// Whether the gateway is running is controlled entirely by the
-// discord start/stop background daemon (or the webui's Start/Stop
-// buttons, which call the same daemon) -- not by a config flag.
-type DiscordConfig struct {
-	Token     string   `json:"token"`
-	OwnerID   string   `json:"owner_id"`
-	Whitelist []string `json:"whitelist"`
 }
 
 // GetConfigPath returns the absolute path to ~/.botsonv2/config.json

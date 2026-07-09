@@ -43,16 +43,6 @@ func Reset(ctx context.Context) error {
 		}
 	}
 
-	keepDiscord, err := AskYesNo("Keep your current Discord settings?", true)
-	if err != nil {
-		return err
-	}
-	if !keepDiscord {
-		if err := promptDiscordSettings(cfg); err != nil {
-			return err
-		}
-	}
-
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}

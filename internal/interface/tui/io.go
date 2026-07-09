@@ -19,9 +19,9 @@ func (m model) runAgentStream(text string) {
 }
 
 // resumeAfterConfirmation answers a pending adk_request_confirmation call
-// and streams whatever the agent does next -- the same
+// and streams whatever the agent does next -- the
 // FunctionResponse{Name: "adk_request_confirmation", ID, Response:
-// {"confirmed": bool}} shape the web console and Discord already send.
+// {"confirmed": bool}} shape ADK itself expects any caller to reply with.
 func (m model) resumeAfterConfirmation(callID string, approved bool) {
 	m.streamEvents(context.Background(), &genai.Content{
 		Role: "user",

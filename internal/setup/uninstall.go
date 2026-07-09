@@ -55,8 +55,7 @@ func Uninstall(ctx context.Context, forceFull bool) error {
 		// Daemons hold their own handle on the same installed binary, so
 		// they need to stop before it can be deleted; not needed for the
 		// lighter PATH/Startup-only paths.
-		stopDaemonQuietly("discord", "Discord gateway")
-		stopDaemonQuietly("web", "Web server")
+		stopDaemonQuietly("core", "Botson core")
 		stopDaemonQuietly("tray", "Tray icon")
 	}
 
