@@ -10,7 +10,6 @@ import (
 	"botson/internal/automode"
 	"botson/internal/daemon"
 	"botson/internal/natsapi"
-	"botson/internal/procutil"
 
 	adkproxy "github.com/Savs-Agents/NATS-ADK-Proxy"
 	"github.com/nats-io/nats-server/v2/server"
@@ -208,11 +207,19 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 		// tool/model round trips, would blow past 30s and fail with
 		// "context deadline exceeded" before the run itself actually
 		// failed. Give it real headroom above the longest normal tool
-		// call instead. Botson-TUI's own NATS request timeout
-		// (adkclient.WithTimeout in its internal/natsapi/client.go)
-		// must stay above this value too, or it becomes the new
-		// bottleneck.
-		RequestTimeout: procutil.DefaultTimeout + 90*time.Second,
+		// call instead. A real agentic turn (many sequential tool calls,
+		// each its own model round trip) can run for minutes, not
+		// seconds -- see NATS-ADK-Proxy's internal/backend/backend.go
+		// for the matching fix on the local ADK REST server's own
+		// http.Server.WriteTimeout (bumped from its 15s default to 10m,
+		// after that exact default caused this same failure mode against
+		// a real long OpenRouter-driven turn: the connection died
+		// mid-handler, and the gateway saw it as a bare EOF).
+		// Botson-TUI's own NATS request timeout (adkclient.WithTimeout in
+		// its internal/natsapi/client.go, and runTurnCmd's per-call ctx
+		// in internal/tui/cmds.go) must stay above this value too, or
+		// one of those becomes the new bottleneck.
+		RequestTimeout: 8 * time.Minute,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to configure the ADK NATS gateway: %w", err)
