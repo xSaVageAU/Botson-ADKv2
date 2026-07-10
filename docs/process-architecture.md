@@ -46,13 +46,15 @@ built from the same underlying `launcher.Config` (agent loader, session
 service, artifact service):
 
 - **`adk.*`** -- the standard ADK REST/A2A surface (list-apps, sessions,
-  running a turn, A2A JSON-RPC), fronted by an imported
-  [`github.com/Savs-Agents/NATS-ADK-Proxy`](https://github.com/Savs-Agents/NATS-ADK-Proxy).
-  That package runs a real `google.golang.org/adk/v2/cmd/launcher/prod`
-  instance on a loopback port and reverse-proxies NATS traffic to it, so
-  behavior always matches upstream ADK exactly -- this repo doesn't
-  reimplement any of it. See that package's own README for the subject
-  and wire-header contract.
+  running a turn, A2A JSON-RPC), fronted by `internal/adkgateway`. It runs a
+  real `google.golang.org/adk/v2/cmd/launcher/prod` instance on a loopback
+  port and reverse-proxies NATS traffic to it, so behavior always matches
+  upstream ADK exactly -- nothing here reimplements any of it. Moved in from
+  the sibling [`NATS-ADK-Proxy`](https://github.com/Savs-Agents/NATS-ADK-Proxy)
+  repo (which only ever had this one consumer); that repo still defines the
+  wire contract this speaks and ships the thin `client` package
+  `internal/automode` uses. See its README for the subject and wire-header
+  contract.
 - **`botson.*`** -- `internal/natsapi`, for the state that isn't part of
   stock ADK's API: settings (`botson.settings.*`), custom-agent CRUD
   (`botson.agents.*`), and dashboard-shaped session listing/inspection
@@ -67,7 +69,7 @@ service, artifact service):
                      │   session DB · artifact store ·       │
                      │   embedded NATS server                │
                      │                                       │
-                     │   adk.*     -> NATS-ADK-Proxy (imported) │
+                     │   adk.*     -> internal/adkgateway     │
                      │   botson.*  -> internal/natsapi          │
                      └───────────────┬───────────────────────┘
                                       │  NATS, over 127.0.0.1
@@ -160,7 +162,7 @@ on the given loopback port, `.Start()` it, wait for `ReadyForConnections`,
 connect a `*nats.Conn` to it, then run two things concurrently against
 that connection (via `errgroup`) until `ctx` is cancelled:
 
-- `adkproxy.New(...).Run(ctx)` -- the imported NATS-ADK-Proxy, serving `adk.*`.
+- `adkgateway.New(...).Run(ctx)` -- `internal/adkgateway`, serving `adk.*`.
 - `natsapi.Serve(ctx, nc, boot.Launcher)` -- serving `botson.*`.
 
 Logs go to `~/.botson/logs/core.log` when detached via `start`; a
@@ -252,12 +254,10 @@ seem like the more likely next places this design gets pushed on.
   work (bind-address enforcement, TLS) before "point a client at a core
   running somewhere else, over a network you don't fully trust" becomes a
   supported idea.
-- **`adk.*` doesn't stream yet.** NATS-ADK-Proxy's REST passthrough for
-  `run` is currently request/reply only (`run_sse`/A2A `message/stream`
-  aren't implemented upstream in that package yet) -- a caller gets the
-  full turn's events back at once rather than incrementally. Since
-  streaming lives in the shared proxy package, Botson inherits it
-  automatically whenever it lands there.
+- **`adk.*` doesn't stream yet.** `internal/adkgateway`'s REST passthrough
+  for `run` is currently request/reply only (`run_sse`/A2A `message/stream`
+  aren't implemented there yet) -- a caller gets the full turn's events back
+  at once rather than incrementally.
 - **No log rotation.** `~/.botson/logs/core.log` grows forever for a
   long-lived core; nothing truncates or rotates it.
 - **No standalone Discord/web project exists yet.** Botson's NATS API
@@ -271,4 +271,4 @@ seem like the more likely next places this design gets pushed on.
 - [AGENTS.md — "Unified core architecture"](../AGENTS.md) -- the condensed version.
 - [docs/nats-api.md](./nats-api.md) -- the full NATS API reference for building your own consumer against a running core.
 - [docs/sessions.md](./sessions.md) -- how session state/history is actually stored, independent of which process is serving it.
-- [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) -- the imported package fronting the `adk.*` surface.
+- [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) -- the sibling repo defining the wire protocol `internal/adkgateway` (this repo) implements, plus a thin Go `client` used cross-repo.

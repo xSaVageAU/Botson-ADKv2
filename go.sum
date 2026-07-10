@@ -6,10 +6,8 @@ cloud.google.com/go/compute/metadata v0.9.0 h1:pDUj4QMoPejqq20dK0Pg2N4yG9zIkYGdB
 cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCBSM6qQI1yTBdEb3C10=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 h1:DHa2U07rk8syqvCge0QIGMCE1WxGj9njT44GH7zNJLQ=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0/go.mod h1:P4WPRUkOhJC13W//jWpyfJNDAIpvRbAUIYLX/4jtlE0=
-github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260709074103-e2a50d1cc806 h1:a7kIg3osLbqVqE+ah8Mk9fFyGWhxDQuqShFIAc6CPOE=
-github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260709074103-e2a50d1cc806/go.mod h1:AyUlW3xIcHcKWFwhWlcaKqx2U0Yg5rX3Ow+u5eA+Y+g=
-github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710063519-6c77d5460700 h1:q6NXHMQQDfGrPgCLJFOky44rgiXmI5Z1+bSZU2oiGYs=
-github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710063519-6c77d5460700/go.mod h1:AyUlW3xIcHcKWFwhWlcaKqx2U0Yg5rX3Ow+u5eA+Y+g=
+github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710065543-67b8773166e3 h1:Tuhi2eX4/DwJq+N+KZHCRBNiZOTMpGyNsqfZ3mO/n8Q=
+github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710065543-67b8773166e3/go.mod h1:YW+PUG4BXPNRFXYlw8ey+dQa+Kl//51VYjHQ4UPZ4jQ=
 github.com/a2aproject/a2a-go v0.3.15 h1:h5YpCiPq3jxQ5rIns7oDjPag3ivP8u817AzdA4F+NiI=
 github.com/a2aproject/a2a-go v0.3.15/go.mod h1:I7Cm+a1oL+UT6zMoP+roaRE5vdfUa1iQGVN8aSOuZ0I=
 github.com/a2aproject/a2a-go/v2 v2.3.1 h1:QWMdOX2UsJ8BJmjs952eo1FRyGsOVl0gFCKeM76AgGE=

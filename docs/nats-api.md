@@ -60,7 +60,7 @@ document is request/reply unless stated otherwise.
 
 | Prefix | What it is | Implemented by |
 |---|---|---|
-| `adk.*` | The standard ADK REST/A2A surface: list agents, create/get sessions, run a turn, A2A JSON-RPC. Matches upstream Google ADK behavior exactly. | An imported [`github.com/Savs-Agents/NATS-ADK-Proxy`](https://github.com/Savs-Agents/NATS-ADK-Proxy) — not code in this repo. |
+| `adk.*` | The standard ADK REST/A2A surface: list agents, create/get sessions, run a turn, A2A JSON-RPC. Matches upstream Google ADK behavior exactly. | `internal/adkgateway` (this repo) — moved in from the sibling [`NATS-ADK-Proxy`](https://github.com/Savs-Agents/NATS-ADK-Proxy) repo, which now just holds the wire protocol + a thin client. |
 | `botson.*` | Everything Botson-specific that isn't part of ADK's own API: settings, custom-agent CRUD, dashboard-shaped session listing/aggregation. | `internal/natsapi` (this repo). |
 
 Use `adk.*` for anything about actually running the agent (sessions, turns,
@@ -71,10 +71,11 @@ its custom agents, browsing session history for a dashboard-style view).
 
 ## 3. `adk.*` — running the agent
 
-Full protocol details live in NATS-ADK-Proxy's own
+Full protocol details live in NATS-ADK-Proxy's
 [README](https://github.com/Savs-Agents/NATS-ADK-Proxy#wire-protocol) and
-its `protocol` package godoc — this section is the practical subset you
-need to drive a chat.
+its `protocol` package godoc (the gateway implementing this side of the
+contract lives here, in `internal/adkgateway`) — this section is the
+practical subset you need to drive a chat.
 
 **Shape**: request/reply, no envelope. The request/response *body* is the
 raw HTTP request/response body ADK's REST API would have used — JSON in,
@@ -128,8 +129,8 @@ etc.).
 **Response** (status 200): a JSON array of `session.Event`-shaped objects,
 the full turn's events at once — `[{"author": "...", "content": {...}}, ...]`.
 There is currently **no streaming** (`run_sse`/A2A `message/stream` aren't
-implemented in NATS-ADK-Proxy yet) — you get the whole turn back in one
-reply, not incrementally. See
+implemented in `internal/adkgateway` yet) — you get the whole turn back in
+one reply, not incrementally. See
 [AGENTS.md](../AGENTS.md#unified-core-architecture) for the tracking note
 on this.
 
@@ -186,7 +187,7 @@ The file/command tools (`listFiles`, `readFile`, `writeFile`, `editFile`,
 (`workspace_root` in settings, below). A session can override this by
 sending upstream ADK's own `stateDelta` field on a `POST /api/run`
 request — it's not part of Botson's own wire format, just a real,
-already-functional field on the request body NATS-ADK-Proxy forwards
+already-functional field on the request body `internal/adkgateway` forwards
 byte-for-byte:
 
 ```json
@@ -284,4 +285,4 @@ Whatever you pick, use it consistently: session lookups
 - [docs/process-architecture.md](./process-architecture.md) — the core process itself: lifecycle, discovery, workspace resolution.
 - [docs/sessions.md](./sessions.md) — session data model and storage schema.
 - [AGENTS.md](../AGENTS.md) — full project reference, including the HITL wire protocol and tool registry.
-- [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) — the imported package implementing `adk.*`; its README and `protocol` package godoc are the authoritative source for that namespace.
+- [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) — the sibling repo defining `adk.*`'s wire protocol and a thin Go `client`; its README and `protocol` package godoc are the authoritative source for the contract. `internal/adkgateway` (this repo) is what actually implements it.

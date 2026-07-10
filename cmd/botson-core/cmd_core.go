@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	"botson/internal/adkgateway"
 	"botson/internal/automode"
 	"botson/internal/daemon"
 	"botson/internal/natsapi"
 
-	adkproxy "github.com/Savs-Agents/NATS-ADK-Proxy"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
@@ -25,8 +25,8 @@ const coreDisplayName = "Botson core"
 // Gemini model, agent registry, and session/artifact services, and the
 // only thing any consumer -- a Discord bot, a web UI, anything -- ever
 // talks to. It's an embedded NATS server plus two subject namespaces on
-// top of it: "adk.*" (an imported github.com/Savs-Agents/NATS-ADK-Proxy,
-// fronting the real ADK REST/A2A surface) and "botson.*"
+// top of it: "adk.*" (internal/adkgateway, fronting the real ADK REST/A2A
+// surface) and "botson.*"
 // (internal/natsapi, for settings/agents/sessions/dashboard -- state
 // that isn't part of stock ADK's own API). There is no other
 // interface in this binary; nothing about this command dispatches to a
@@ -171,7 +171,7 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 
 	// The server's own Authorization token (above) gates every connection,
 	// including this in-process one -- without passing it here, the core's
-	// own adkproxy/natsapi wiring would be rejected by its own server.
+	// own adkgateway/natsapi wiring would be rejected by its own server.
 	nc, err := nats.Connect(srv.ClientURL(), nats.Token(boot.Config.NatsAuthToken))
 	if err != nil {
 		return fmt.Errorf("failed to connect to the embedded NATS server: %w", err)
@@ -194,13 +194,13 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 		fmt.Printf("Provider: %s, model: %s\n", provider, boot.Config.ModelName)
 	}
 
-	proxy, err := adkproxy.New(adkproxy.Config{
+	gw, err := adkgateway.New(adkgateway.Config{
 		NATSConn:      nc,
 		ADK:           *boot.Launcher,
 		SubjectPrefix: "adk",
 		// The gateway's own per-request HTTP deadline to the local ADK
-		// backend defaults to a fixed 30s (NATS-ADK-Proxy's
-		// gateway.Options.RequestTimeout), which is shorter than
+		// backend defaults to a fixed 30s (gatewayOptions.requestTimeout
+		// in internal/adkgateway/gateway.go), which is shorter than
 		// runCommand's own default subprocess timeout
 		// (procutil.DefaultTimeout) -- a turn with even one
 		// default-timeout runCommand call, or a few sequential
@@ -209,16 +209,17 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 		// failed. Give it real headroom above the longest normal tool
 		// call instead. A real agentic turn (many sequential tool calls,
 		// each its own model round trip) can run for minutes, not
-		// seconds -- see NATS-ADK-Proxy's internal/backend/backend.go
-		// for the matching fix on the local ADK REST server's own
-		// http.Server.WriteTimeout (bumped from its 15s default to 10m,
-		// after that exact default caused this same failure mode against
-		// a real long OpenRouter-driven turn: the connection died
-		// mid-handler, and the gateway saw it as a bare EOF).
-		// Botson-TUI's own NATS request timeout (adkclient.WithTimeout in
-		// its internal/natsapi/client.go, and runTurnCmd's per-call ctx
-		// in internal/tui/cmds.go) must stay above this value too, or
-		// one of those becomes the new bottleneck.
+		// seconds -- see internal/adkgateway/backend.go's
+		// serverWriteTimeout for the matching fix on the local ADK REST
+		// server's own http.Server.WriteTimeout (bumped from its 15s
+		// default to 10m, after that exact default caused this same
+		// failure mode against a real long OpenRouter-driven turn: the
+		// connection died mid-handler, and the gateway saw it as a bare
+		// EOF). Botson-TUI's own NATS request timeout
+		// (adkclient.WithTimeout in its internal/natsapi/client.go, and
+		// runTurnCmd's per-call ctx in internal/tui/cmds.go) must stay
+		// above this value too, or one of those becomes the new
+		// bottleneck.
 		RequestTimeout: 8 * time.Minute,
 	})
 	if err != nil {
@@ -226,7 +227,7 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.Go(func() error { return proxy.Run(gctx) })
+	g.Go(func() error { return gw.Run(gctx) })
 	g.Go(func() error { return natsapi.Serve(gctx, nc, boot.Launcher) })
 	g.Go(func() error { return automode.Run(gctx, nc, boot.Launcher) })
 	if err := g.Wait(); err != nil {

@@ -7,7 +7,7 @@ It can read and manage files, hold persistent conversations, and ask for approva
 ## Features
 
 - **One core, NATS-only** — `botson core` is the only process that ever holds the agent runtime; nothing about running Botson requires a specific frontend
-- **Standard ADK surface over NATS** — list-apps, sessions, running a turn, and A2A, fronted by an imported [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy) under the `adk.` subject prefix, matching upstream ADK's own REST/A2A behavior exactly
+- **Standard ADK surface over NATS** — list-apps, sessions, running a turn, and A2A, fronted by `internal/adkgateway` under the `adk.` subject prefix, matching upstream ADK's own REST/A2A behavior exactly
 - **Botson-specific state over NATS too** — settings, custom-agent CRUD, and dashboard-shaped session listing, under the `botson.` subject prefix (`internal/natsapi`) — nothing requires touching `~/.botson/` files directly
 - **Human-in-the-loop approvals** — sensitive tool calls pause for a yes/no confirmation
 - **Custom agents** — define your own agents and tool sets, saved under `~/.botson/agents/`
@@ -33,7 +33,7 @@ An interactive wizard asks for your Gemini API key and root agent, and writes `~
 ```bash
 botson core start   # or `botson core` to run in the foreground
 ```
-From here, talk to it over NATS — see `internal/natsapi/subjects.go` for the `botson.*` subject table and [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy)'s README for the `adk.*` surface. `botson --help` lists the CLI's two subcommands (`core`, `setup`); there is no third.
+From here, talk to it over NATS — see `internal/natsapi/subjects.go` for the `botson.*` subject table and [docs/nats-api.md](./docs/nats-api.md) for the `adk.*` surface (whose wire protocol is also documented in [NATS-ADK-Proxy](https://github.com/Savs-Agents/NATS-ADK-Proxy)'s README). `botson --help` lists the CLI's two subcommands (`core`, `setup`); there is no third.
 
 Every connection needs the NATS auth token `setup install` just generated and printed — it's also in `~/.botson/config.json`'s `nats_auth_token` field. A consumer on the same machine (e.g. [Botson-TUI](https://github.com/Savs-Agents/Botson-TUI)) can read that file directly and pair with zero configuration; a remote consumer needs the token copied over separately.
 

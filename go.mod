@@ -3,7 +3,7 @@ module botson
 go 1.26.3
 
 require (
-	github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710063519-6c77d5460700
+	github.com/Savs-Agents/NATS-ADK-Proxy v0.0.0-20260710065543-67b8773166e3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/nats-io/nats-server/v2 v2.14.3
 	github.com/nats-io/nats.go v1.52.0
