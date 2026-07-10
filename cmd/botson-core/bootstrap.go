@@ -71,7 +71,7 @@ func setupApp(ctx context.Context) (*appBoot, error) {
 			SessionService:  dbSessionService,
 			ArtifactService: localArtifactService,
 			AgentLoader:     loader,
-			PluginConfig:    runner.PluginConfig{Plugins: []*plugin.Plugin{toolorder.New()}},
+			PluginConfig:    runner.PluginConfig{Plugins: []*plugin.Plugin{toolorder.New(agent.RequiresConfirmation)}},
 		},
 	}, nil
 }

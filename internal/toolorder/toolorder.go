@@ -6,8 +6,10 @@
 //
 // Without this, calls resumed together after a batch of HITL confirmations
 // are answered (e.g. writeFile + editFile, both approved in the same round
-// trip) execute concurrently, racing to touch the same file. This plugin
-// makes them execute in the order the model emitted them instead.
+// trip) execute concurrently, racing to touch the same file, and a non-gated
+// call emitted after a gated one (e.g. readFile after writeFile) executes
+// immediately, before the gated call's real effect has landed. This plugin
+// makes every call in the batch execute in the order the model emitted them.
 //
 // # How it works
 //
@@ -36,18 +38,33 @@
 //     every gated call in the batch resumes together in this same pass, so
 //     nothing this waits on is stuck in some other, later round trip.
 //
-// # Known limitation
+// # Deferred (synthetic) confirmations
 //
-// A non-gated, read-only call (e.g. readFile) placed after a gated call in
-// the same turn can still run before that gated call's real effect lands,
-// because deferring it past the ask pass would deadlock the turn (see above).
-// Every mutating Botson tool requires confirmation, so this can only ever
-// produce a stale read within the same turn -- never a corrupted write.
-// Fixing it fully would require forking ADK's own dispatch loop.
+// The ask-phase wait alone leaves one hole: a non-gated call (e.g. readFile)
+// positioned after a gated call would really run during the ask pass, before
+// the gated call's approved effect lands. Blocking it until the gated call
+// finishes would deadlock the turn (see above), so instead, once the ask-phase
+// wait clears and some earlier call is paused awaiting confirmation, this
+// plugin pauses the non-gated call the exact same way a gated tool pauses
+// itself: BeforeToolCallback calls ctx.RequestConfirmation with a payload of
+// {DeferredPayloadKey: true} and returns tool.ErrConfirmationRequired, so the
+// real tool handler never runs in the ask pass. The call then rides ADK's
+// normal confirmation resume alongside its gated siblings, where the strict
+// wait serializes it into its emitted position.
+//
+// The payload marker is the contract with clients: a confirmation whose
+// payload carries DeferredPayloadKey == true exists only for ordering, not
+// for human judgment, and the client must answer it {"confirmed": true}
+// immediately, batched with the user's answers to that turn's real
+// confirmations (Botson-TUI does this in its confirmation queue). A gated
+// call in the same spot is left alone -- its own tool.Run pauses it with a
+// real, human-facing confirmation -- which is why New takes the
+// requiresConfirmation predicate (wired to internal/agent's registry).
 package toolorder
 
 import (
 	"errors"
+	"fmt"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/model"
@@ -55,13 +72,31 @@ import (
 	"google.golang.org/adk/v2/tool"
 )
 
+// DeferredPayloadKey marks a synthetic, ordering-only confirmation's payload.
+// Clients must auto-answer {"confirmed": true} for confirmations whose
+// payload has this key set to true, instead of prompting a human -- see the
+// package doc and AGENTS.md's "HITL confirmation wire protocol".
+const DeferredPayloadKey = "botsonToolOrderDeferred"
+
+// orderPlugin carries the one piece of configuration the callbacks need:
+// which tools pause for a real HITL confirmation on their own (and so must
+// never be given a synthetic one, or the human approval would be skipped).
+type orderPlugin struct {
+	requiresConfirmation func(toolName string) bool
+}
+
 // New returns the ToolOrderPlugin, ready to add to a runner.PluginConfig.
-func New() *plugin.Plugin {
+// requiresConfirmation reports whether the named tool is built with
+// RequireConfirmation: true (wire it to internal/agent.RequiresConfirmation);
+// nil is treated as "no tool is gated".
+func New(requiresConfirmation func(toolName string) bool) *plugin.Plugin {
+	op := &orderPlugin{requiresConfirmation: requiresConfirmation}
 	p, err := plugin.New(plugin.Config{
-		Name:               "ToolOrderPlugin",
-		AfterModelCallback: afterModel,
-		BeforeToolCallback: beforeTool,
-		AfterToolCallback:  afterTool,
+		Name:                "ToolOrderPlugin",
+		AfterModelCallback:  afterModel,
+		BeforeToolCallback:  op.beforeTool,
+		AfterToolCallback:   afterTool,
+		OnToolErrorCallback: onToolError,
 	})
 	if err != nil {
 		// plugin.New has no error path in the current ADK version; a panic
@@ -88,9 +123,9 @@ func afterModel(ctx agent.Context, resp *model.LLMResponse, respErr error) (*mod
 	return nil, nil
 }
 
-func beforeTool(ctx agent.Context, _ tool.Tool, _ map[string]any) (map[string]any, error) {
-	t := lookupTicket(ctx)
-	if t == nil {
+func (op *orderPlugin) beforeTool(ctx agent.Context, t tool.Tool, _ map[string]any) (map[string]any, error) {
+	tk := lookupTicket(ctx)
+	if tk == nil {
 		return nil, nil
 	}
 	// A non-nil ToolConfirmation means this call is being resumed after
@@ -99,10 +134,40 @@ func beforeTool(ctx agent.Context, _ tool.Tool, _ map[string]any) (map[string]an
 	// ask. See readyLocked for why that distinction changes what "the call
 	// ahead of me is out of the way" means.
 	strict := ctx.ToolConfirmation() != nil
-	if err := waitTurn(ctx, t, strict); err != nil {
+	if err := waitTurn(ctx, tk, strict); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	if strict {
+		return nil, nil
+	}
+	// Ask phase, and every earlier call has now reached a decision. If none
+	// of them is paused awaiting confirmation, this call's real execution is
+	// truly next in line and may proceed. Otherwise, running it now would
+	// land its effect before the paused calls' approved effects (the
+	// readFile-after-writeFile case) -- so it must move to the resume pass.
+	if !anyEarlierPaused(tk) {
+		return nil, nil
+	}
+	var name string
+	if t != nil {
+		name = t.Name()
+	}
+	if op.requiresConfirmation != nil && op.requiresConfirmation(name) {
+		// Gated: its own tool.Run is about to pause it with a real,
+		// human-facing confirmation. Don't preempt that with a synthetic
+		// one, or the human approval would be silently skipped.
+		return nil, nil
+	}
+	if err := ctx.RequestConfirmation(
+		fmt.Sprintf("Tool call %s() is deferred until this turn's earlier tool calls finish; no human approval is needed -- answer confirmed: true.", name),
+		map[string]any{DeferredPayloadKey: true},
+	); err != nil {
+		return nil, err
+	}
+	// The wrapped sentinel's text ("requires confirmation, ...") is part of
+	// the wire contract: clients detect ADK's bookkeeping functionResponse
+	// by that substring (see AGENTS.md step 2 of the HITL sequence).
+	return nil, fmt.Errorf("error tool %q deferred behind earlier calls in this turn: %w", name, tool.ErrConfirmationRequired)
 }
 
 func afterTool(ctx agent.Context, _ tool.Tool, _, _ map[string]any, err error) (map[string]any, error) {
@@ -116,5 +181,25 @@ func afterTool(ctx agent.Context, _ tool.Tool, _, _ map[string]any, err error) (
 	}
 	markDone(t)
 	deleteTicket(ctx)
+	return nil, nil
+}
+
+// onToolError marks a call's position done when its error is final. This is
+// belt-and-braces for the one dispatch path that never reaches the
+// after-tool callbacks at all -- ADK's tool-not-found handling
+// (base_flow.go's handleFunctionCalls) runs only the on-error callbacks --
+// where an unresolved position would otherwise block every later sibling's
+// ask until the turn's context deadline. ErrConfirmationRequired is not
+// final (the call pauses and resumes later), so it stays with afterTool's
+// markPaused. On the normal callTool path this runs before afterTool and
+// deleteTicket makes the later afterTool a no-op.
+func onToolError(ctx agent.Context, _ tool.Tool, _ map[string]any, err error) (map[string]any, error) {
+	if errors.Is(err, tool.ErrConfirmationRequired) {
+		return nil, nil
+	}
+	if t := lookupTicket(ctx); t != nil {
+		markDone(t)
+		deleteTicket(ctx)
+	}
 	return nil, nil
 }

@@ -71,6 +71,22 @@ func (b *batch) readyLocked(position int, strict bool) bool {
 	return true
 }
 
+// anyEarlierPaused reports whether some call before t's position is paused
+// awaiting confirmation (asked, not yet resolved). Meaningful only right
+// after an ask-phase waitTurn returned: every earlier position has reached a
+// decision, and paused entries can't change until a later resume pass, so
+// the answer is stable for the rest of this pass.
+func anyEarlierPaused(t *ticket) bool {
+	t.b.mu.Lock()
+	defer t.b.mu.Unlock()
+	for j := range t.position {
+		if t.b.paused[j] && !t.b.done[j] {
+			return true
+		}
+	}
+	return false
+}
+
 // ticket is one call's claim on a position within a batch.
 type ticket struct {
 	b        *batch

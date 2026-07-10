@@ -2,6 +2,7 @@ package toolorder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -12,14 +13,18 @@ import (
 )
 
 // fakeCtx is a minimal agent.Context stand-in: everything this package
-// actually reads (SessionID, FunctionCallID, ToolConfirmation, and the
-// embedded context.Context for cancellation) is overridden; anything else
-// would panic via StrictContextMock if this package ever started using it.
+// actually reads (SessionID, FunctionCallID, ToolConfirmation,
+// RequestConfirmation, and the embedded context.Context for cancellation)
+// is overridden; anything else would panic via StrictContextMock if this
+// package ever started using it.
 type fakeCtx struct {
 	agent.StrictContextMock
 	sessionID    string
 	callID       string
 	confirmation *toolconfirmation.ToolConfirmation
+
+	requestedHint    string
+	requestedPayload any
 }
 
 func newFakeCtx(ctx context.Context, sessionID, callID string) *fakeCtx {
@@ -31,8 +36,31 @@ func (f *fakeCtx) FunctionCallID() string { return f.callID }
 func (f *fakeCtx) ToolConfirmation() *toolconfirmation.ToolConfirmation {
 	return f.confirmation
 }
+func (f *fakeCtx) RequestConfirmation(hint string, payload any) error {
+	f.requestedHint = hint
+	f.requestedPayload = payload
+	return nil
+}
 
 var _ agent.Context = (*fakeCtx)(nil)
+
+// fakeTool is the little bit of tool.Tool the plugin reads (Name only).
+type fakeTool struct {
+	tool.Tool
+	name string
+}
+
+func (f fakeTool) Name() string { return f.name }
+
+// newPlugin builds an orderPlugin whose gated set is exactly gatedNames --
+// mirroring how bootstrap wires New to internal/agent.RequiresConfirmation.
+func newPlugin(gatedNames ...string) *orderPlugin {
+	gated := map[string]bool{}
+	for _, n := range gatedNames {
+		gated[n] = true
+	}
+	return &orderPlugin{requiresConfirmation: func(name string) bool { return gated[name] }}
+}
 
 const shortWait = 100 * time.Millisecond
 
@@ -57,18 +85,19 @@ func mustProceed(t *testing.T, done <-chan struct{}, what string) {
 // Two calls that never need confirmation (or already have it) must still
 // execute their real work in position order.
 func TestRealPhaseSerializesInOrder(t *testing.T) {
+	op := newPlugin()
 	sess := "sess-real"
 	registerBatch(sess, []string{"a", "b"})
 	ctxA := newFakeCtx(context.Background(), sess, "a")
 	ctxB := newFakeCtx(context.Background(), sess, "b")
 
-	if _, err := beforeTool(ctxA, nil, nil); err != nil {
+	if _, err := op.beforeTool(ctxA, nil, nil); err != nil {
 		t.Fatalf("beforeTool(A): %v", err)
 	}
 
 	bDone := make(chan struct{})
 	go func() {
-		if _, err := beforeTool(ctxB, nil, nil); err != nil {
+		if _, err := op.beforeTool(ctxB, nil, nil); err != nil {
 			t.Errorf("beforeTool(B): %v", err)
 		}
 		close(bDone)
@@ -86,14 +115,17 @@ func TestRealPhaseSerializesInOrder(t *testing.T) {
 }
 
 // A gated call merely asking for confirmation (ErrConfirmationRequired) must
-// not block a later sibling's own ask -- only its real completion would.
-func TestAskPhasePauseDoesNotBlockSiblingAsk(t *testing.T) {
+// not block a later gated sibling's own ask -- only its real completion
+// would. The sibling is gated, so it is left to pause itself rather than
+// being deferred.
+func TestAskPhasePauseDoesNotBlockSiblingGatedAsk(t *testing.T) {
+	op := newPlugin("writeFile", "editFile")
 	sess := "sess-ask"
 	registerBatch(sess, []string{"a", "b"})
 	ctxA := newFakeCtx(context.Background(), sess, "a")
 	ctxB := newFakeCtx(context.Background(), sess, "b")
 
-	if _, err := beforeTool(ctxA, nil, nil); err != nil {
+	if _, err := op.beforeTool(ctxA, fakeTool{name: "writeFile"}, nil); err != nil {
 		t.Fatalf("beforeTool(A ask): %v", err)
 	}
 	pauseErr := fmt.Errorf("tool %q %w", "a", tool.ErrConfirmationRequired)
@@ -103,12 +135,98 @@ func TestAskPhasePauseDoesNotBlockSiblingAsk(t *testing.T) {
 
 	bDone := make(chan struct{})
 	go func() {
-		if _, err := beforeTool(ctxB, nil, nil); err != nil {
+		if _, err := op.beforeTool(ctxB, fakeTool{name: "editFile"}, nil); err != nil {
 			t.Errorf("beforeTool(B ask): %v", err)
 		}
 		close(bDone)
 	}()
 	mustProceed(t, bDone, "B's ask")
+	if ctxB.requestedHint != "" {
+		t.Fatalf("gated B was given a synthetic confirmation (hint %q); its own Run must ask instead", ctxB.requestedHint)
+	}
+}
+
+// A non-gated call positioned after a paused gated call must not really run
+// in the ask pass: beforeTool defers it with a synthetic confirmation
+// (payload marked DeferredPayloadKey) and ErrConfirmationRequired, and the
+// resume pass then serializes it after the gated call's real completion.
+func TestNonGatedCallDeferredBehindPause(t *testing.T) {
+	op := newPlugin("writeFile")
+	sess := "sess-defer"
+	registerBatch(sess, []string{"a", "b"})
+	ctxA := newFakeCtx(context.Background(), sess, "a")
+	ctxB := newFakeCtx(context.Background(), sess, "b")
+
+	// Ask pass: gated A pauses; non-gated B must be deferred, not run.
+	if _, err := op.beforeTool(ctxA, fakeTool{name: "writeFile"}, nil); err != nil {
+		t.Fatalf("beforeTool(A ask): %v", err)
+	}
+	pauseErr := fmt.Errorf("tool %q %w", "a", tool.ErrConfirmationRequired)
+	if _, err := afterTool(ctxA, nil, nil, nil, pauseErr); err != nil {
+		t.Fatalf("afterTool(A pause): %v", err)
+	}
+
+	_, err := op.beforeTool(ctxB, fakeTool{name: "readFile"}, nil)
+	if !errors.Is(err, tool.ErrConfirmationRequired) {
+		t.Fatalf("beforeTool(B ask) = %v, want ErrConfirmationRequired", err)
+	}
+	payload, ok := ctxB.requestedPayload.(map[string]any)
+	if !ok || payload[DeferredPayloadKey] != true {
+		t.Fatalf("B's synthetic confirmation payload = %#v, want map with %q: true", ctxB.requestedPayload, DeferredPayloadKey)
+	}
+	if _, aerr := afterTool(ctxB, nil, nil, nil, err); aerr != nil {
+		t.Fatalf("afterTool(B pause): %v", aerr)
+	}
+
+	// Resume pass (both confirmed, dispatched B-first like ADK's
+	// map-iteration resume can): B must wait for A's real completion.
+	ctxA.confirmation = &toolconfirmation.ToolConfirmation{Confirmed: true}
+	ctxB.confirmation = &toolconfirmation.ToolConfirmation{Confirmed: true}
+
+	bDone := make(chan struct{})
+	go func() {
+		if _, err := op.beforeTool(ctxB, fakeTool{name: "readFile"}, nil); err != nil {
+			t.Errorf("beforeTool(B resume): %v", err)
+		}
+		close(bDone)
+	}()
+	mustNotProceed(t, bDone, "B's resume (position 1)")
+
+	if _, err := op.beforeTool(ctxA, fakeTool{name: "writeFile"}, nil); err != nil {
+		t.Fatalf("beforeTool(A resume): %v", err)
+	}
+	if _, err := afterTool(ctxA, nil, nil, nil, nil); err != nil {
+		t.Fatalf("afterTool(A resume): %v", err)
+	}
+	mustProceed(t, bDone, "B's resume (position 1, after A finished)")
+
+	if _, err := afterTool(ctxB, nil, nil, nil, nil); err != nil {
+		t.Fatalf("afterTool(B resume): %v", err)
+	}
+}
+
+// A non-gated call whose earlier siblings all really finished must run
+// immediately in the ask pass -- no synthetic confirmation.
+func TestNonGatedCallRunsWhenEarlierDone(t *testing.T) {
+	op := newPlugin("writeFile")
+	sess := "sess-done"
+	registerBatch(sess, []string{"a", "b"})
+	ctxA := newFakeCtx(context.Background(), sess, "a")
+	ctxB := newFakeCtx(context.Background(), sess, "b")
+
+	if _, err := op.beforeTool(ctxA, fakeTool{name: "listFiles"}, nil); err != nil {
+		t.Fatalf("beforeTool(A): %v", err)
+	}
+	if _, err := afterTool(ctxA, nil, nil, nil, nil); err != nil {
+		t.Fatalf("afterTool(A): %v", err)
+	}
+
+	if _, err := op.beforeTool(ctxB, fakeTool{name: "readFile"}, nil); err != nil {
+		t.Fatalf("beforeTool(B) = %v, want nil (no deferral needed)", err)
+	}
+	if ctxB.requestedHint != "" {
+		t.Fatalf("B was deferred (hint %q) even though A had really finished", ctxB.requestedHint)
+	}
 }
 
 // Once both calls are resumed (ToolConfirmation now set on the context),
@@ -116,14 +234,16 @@ func TestAskPhasePauseDoesNotBlockSiblingAsk(t *testing.T) {
 // the resume dispatches the later position's BeforeToolCallback first,
 // mirroring ADK's own map-iteration-order resume dispatch.
 func TestResumePassSerializesRegardlessOfDispatchOrder(t *testing.T) {
+	op := newPlugin()
 	sess := "sess-resume"
 	registerBatch(sess, []string{"a", "b"})
 	ctxA := newFakeCtx(context.Background(), sess, "a")
 	ctxB := newFakeCtx(context.Background(), sess, "b")
 
-	// Ask phase: both pause.
+	// Ask phase: both pause (gated tools pause themselves; the plugin's
+	// gated-set is irrelevant here since afterTool drives the state).
 	for _, c := range []*fakeCtx{ctxA, ctxB} {
-		if _, err := beforeTool(c, nil, nil); err != nil {
+		if _, err := op.beforeTool(c, nil, nil); err != nil && !errors.Is(err, tool.ErrConfirmationRequired) {
 			t.Fatalf("beforeTool(%s ask): %v", c.callID, err)
 		}
 		pauseErr := fmt.Errorf("tool %q %w", c.callID, tool.ErrConfirmationRequired)
@@ -138,14 +258,14 @@ func TestResumePassSerializesRegardlessOfDispatchOrder(t *testing.T) {
 
 	bDone := make(chan struct{})
 	go func() {
-		if _, err := beforeTool(ctxB, nil, nil); err != nil {
+		if _, err := op.beforeTool(ctxB, nil, nil); err != nil {
 			t.Errorf("beforeTool(B resume): %v", err)
 		}
 		close(bDone)
 	}()
 	mustNotProceed(t, bDone, "B's resume (position 1)")
 
-	if _, err := beforeTool(ctxA, nil, nil); err != nil {
+	if _, err := op.beforeTool(ctxA, nil, nil); err != nil {
 		t.Fatalf("beforeTool(A resume): %v", err)
 	}
 	mustNotProceed(t, bDone, "B's resume (position 1, A still running)")
@@ -160,14 +280,34 @@ func TestResumePassSerializesRegardlessOfDispatchOrder(t *testing.T) {
 	}
 }
 
+// ADK's tool-not-found dispatch path never reaches the after-tool callbacks,
+// only the on-error ones -- onToolError must resolve that position so later
+// siblings don't block until the turn's deadline.
+func TestOnToolErrorResolvesPosition(t *testing.T) {
+	op := newPlugin()
+	sess := "sess-onerror"
+	registerBatch(sess, []string{"a", "b"})
+	ctxA := newFakeCtx(context.Background(), sess, "a")
+	ctxB := newFakeCtx(context.Background(), sess, "b")
+
+	if _, err := onToolError(ctxA, nil, nil, errors.New("tool \"nope\" not found")); err != nil {
+		t.Fatalf("onToolError(A): %v", err)
+	}
+
+	if _, err := op.beforeTool(ctxB, fakeTool{name: "readFile"}, nil); err != nil {
+		t.Fatalf("beforeTool(B) = %v, want nil (A's failure is final)", err)
+	}
+}
+
 // A waiter blocked on an earlier call must be released by context
 // cancellation instead of hanging forever.
 func TestWaitTurnUnblocksOnContextCancellation(t *testing.T) {
+	op := newPlugin()
 	sess := "sess-cancel"
 	registerBatch(sess, []string{"a", "b"})
 
 	ctxA := newFakeCtx(context.Background(), sess, "a")
-	if _, err := beforeTool(ctxA, nil, nil); err != nil {
+	if _, err := op.beforeTool(ctxA, nil, nil); err != nil {
 		t.Fatalf("beforeTool(A ask): %v", err)
 	}
 	pauseErr := fmt.Errorf("tool %q %w", "a", tool.ErrConfirmationRequired)
@@ -181,7 +321,7 @@ func TestWaitTurnUnblocksOnContextCancellation(t *testing.T) {
 
 	bErr := make(chan error, 1)
 	go func() {
-		_, err := beforeTool(ctxB, nil, nil)
+		_, err := op.beforeTool(ctxB, nil, nil)
 		bErr <- err
 	}()
 
