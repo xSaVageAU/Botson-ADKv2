@@ -35,6 +35,7 @@ func Serve(ctx context.Context, nc *nats.Conn, cfg *launcher.Config) error {
 		{SubjectSessionsList, handleSessionsList(ctx, cfg)},
 		{SubjectSessionsGet, handleSessionsGet(ctx, cfg)},
 		{SubjectSessionsDelete, handleSessionsDelete(ctx, cfg)},
+		{SubjectSessionsSetAutoMode, handleSessionsSetAutoMode(ctx, cfg)},
 
 		{SubjectDashboardStats, handleDashboardStats(ctx, cfg)},
 		{SubjectDashboardUsers, handleDashboardUsers(ctx, cfg)},
@@ -250,6 +251,22 @@ func handleSessionsDelete(ctx context.Context, cfg *launcher.Config) nats.MsgHan
 		}
 
 		if err := management.DeleteSession(ctx, cfg.SessionService, req.Agent, req.User, req.SessionID); err != nil {
+			respondError(msg, err)
+			return
+		}
+		respond(msg, map[string]string{})
+	}
+}
+
+func handleSessionsSetAutoMode(ctx context.Context, cfg *launcher.Config) nats.MsgHandler {
+	return func(msg *nats.Msg) {
+		var req SessionsSetAutoModeRequest
+		if err := json.Unmarshal(msg.Data, &req); err != nil {
+			respondError(msg, err)
+			return
+		}
+
+		if err := management.SetSessionAutoMode(ctx, cfg.SessionService, req.Agent, req.User, req.SessionID, req.Enabled, ""); err != nil {
 			respondError(msg, err)
 			return
 		}

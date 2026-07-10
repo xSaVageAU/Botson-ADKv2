@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"botson/internal/automode"
 	"botson/internal/daemon"
 	"botson/internal/natsapi"
 	"botson/internal/procutil"
@@ -220,6 +221,7 @@ func runCoreServer(ctx context.Context, port int, quiet bool) error {
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return proxy.Run(gctx) })
 	g.Go(func() error { return natsapi.Serve(gctx, nc, boot.Launcher) })
+	g.Go(func() error { return automode.Run(gctx, nc, boot.Launcher) })
 	if err := g.Wait(); err != nil {
 		return fmt.Errorf("core server execution failed: %w", err)
 	}

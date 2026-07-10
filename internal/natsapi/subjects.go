@@ -20,9 +20,10 @@ const (
 	SubjectAgentsSave   = "botson.agents.save"
 	SubjectAgentsDelete = "botson.agents.delete"
 
-	SubjectSessionsList   = "botson.sessions.list"
-	SubjectSessionsGet    = "botson.sessions.get"
-	SubjectSessionsDelete = "botson.sessions.delete"
+	SubjectSessionsList        = "botson.sessions.list"
+	SubjectSessionsGet         = "botson.sessions.get"
+	SubjectSessionsDelete      = "botson.sessions.delete"
+	SubjectSessionsSetAutoMode = "botson.sessions.setAutoMode"
 
 	SubjectDashboardStats = "botson.dashboard.stats"
 	SubjectDashboardUsers = "botson.dashboard.users"
@@ -84,4 +85,13 @@ type SessionsDeleteRequest struct {
 	Agent     string `json:"agent"`
 	User      string `json:"user"`
 	SessionID string `json:"sessionId"`
+}
+
+// SessionsSetAutoModeRequest is the request payload for
+// SubjectSessionsSetAutoMode -- see management.AutoModeStateKey.
+type SessionsSetAutoModeRequest struct {
+	Agent     string `json:"agent"`
+	User      string `json:"user"`
+	SessionID string `json:"sessionId"`
+	Enabled   bool   `json:"enabled"`
 }

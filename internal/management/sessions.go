@@ -7,7 +7,18 @@ import (
 	"time"
 
 	"google.golang.org/adk/v2/session"
+	"google.golang.org/genai"
 )
+
+// AutoModeStateKey is the flat session-state key that turns "auto mode" on
+// for one session -- a durable, per-session flag internal/automode's
+// background worker polls for, and Botson-TUI reads back from
+// SessionsGet's State map to know whether to auto-answer confirmations
+// itself while connected. Flat (not nested in a map), same convention as
+// "botson:cwd" and "botson:tools:read:<path>" -- see
+// internal/tools/read_tracking.go for why flat keys survive the JSON
+// round-trip on reload where a nested map value wouldn't.
+const AutoModeStateKey = "botson:autoMode"
 
 // SessionEventSummary is one event in a session's history, rendered down
 // to what's useful to display -- who said it, when, and its text (tool
@@ -93,6 +104,34 @@ func GetSession(ctx context.Context, svc session.Service, appName, userID, sessi
 	}
 
 	return detail, nil
+}
+
+// SetSessionAutoMode durably sets or clears a session's own AutoModeStateKey
+// flag by appending a synthetic event carrying just a StateDelta -- the same
+// persistence path a real turn's own state changes already go through
+// (session.Service.AppendEvent), so the change survives a core restart and
+// is visible to internal/automode's polling loop immediately, without
+// waiting on any client to send a turn. reason, if non-empty, is also
+// recorded as a plain text part on the same event (e.g. when automode
+// itself disables the flag after hitting its safety cap) so a returning
+// user sees why without checking logs.
+func SetSessionAutoMode(ctx context.Context, svc session.Service, appName, userID, sessionID string, enabled bool, reason string) error {
+	resp, err := svc.Get(ctx, &session.GetRequest{AppName: appName, UserID: userID, SessionID: sessionID})
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	ev := session.NewEvent(ctx, "botson-automode-toggle")
+	ev.Author = "system"
+	ev.Actions.StateDelta[AutoModeStateKey] = enabled
+	if reason != "" {
+		ev.Content = &genai.Content{Role: "model", Parts: []*genai.Part{{Text: reason}}}
+	}
+
+	if err := svc.AppendEvent(ctx, resp.Session, ev); err != nil {
+		return fmt.Errorf("failed to persist auto-mode flag: %w", err)
+	}
+	return nil
 }
 
 // DeleteSession removes a session by its full composite key. Matches the
