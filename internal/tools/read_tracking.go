@@ -67,7 +67,7 @@ func requireFileReadBeforeWrite(ctx agent.Context, fullPath string) error {
 		return nil // new (or inaccessible) file: nothing to enforce
 	}
 	if !wasFileRead(ctx, fullPath) {
-		return fmt.Errorf("you must read %s with readFile at least once in this conversation before writing or editing it", fullPath)
+		return fmt.Errorf("%s already exists on disk with content you haven't seen yet in this conversation -- you must read it with readFile at least once before writing or editing it, so you don't blindly overwrite content you're not aware of", fullPath)
 	}
 	return nil
 }
