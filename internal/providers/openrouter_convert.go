@@ -222,26 +222,60 @@ func toTools(tools []*genai.Tool) []chatTool {
 			if fd == nil {
 				continue
 			}
-			// OpenAI-compatible APIs expect "parameters" to always be a
-			// valid JSON Schema object, even for a tool that takes no
-			// arguments -- omitting it entirely (which schemaToJSONSchema
-			// alone would do for a nil/argument-less Schema) is spec-
-			// incorrect and some backends behind OpenRouter reject it.
-			params := schemaToJSONSchema(fd.Parameters)
-			if params == nil {
-				params = map[string]any{"type": "object", "properties": map[string]any{}}
-			}
 			out = append(out, chatTool{
 				Type: "function",
 				Function: chatToolFunction{
 					Name:        fd.Name,
 					Description: fd.Description,
-					Parameters:  params,
+					Parameters:  functionParameters(fd),
 				},
 			})
 		}
 	}
 	return out
+}
+
+// functionParameters extracts an OpenAI-compatible "parameters" JSON Schema
+// object for fd.
+//
+// ADK's functiontool.New (google.golang.org/adk/v2/tool/functiontool)
+// populates FunctionDeclaration.ParametersJsonSchema -- a real JSON Schema
+// built from the Go struct's own jsonschema tags via
+// github.com/google/jsonschema-go -- and never sets the older, Gemini-
+// native Parameters (*genai.Schema) field at all. Every Botson tool goes
+// through functiontool.New, so reading fd.Parameters (as this function
+// used to) always found nil and silently fell back to an empty,
+// argument-less schema for every tool, regardless of what it actually
+// declares -- the model still knew each tool's name and description, just
+// not a single one of its real argument names, which is why it fell back
+// to guessing generic ones (e.g. "path" instead of "filePath"). Gemini
+// itself never hit this: its own API is called through genai.Client
+// directly, which reads ParametersJsonSchema correctly.
+//
+// ParametersJsonSchema is typed `any`, but jsonschema.Resolved.Schema()
+// (what populates it) returns a plain, fully JSON-tagged *jsonschema.Schema
+// struct, so round-tripping it through json.Marshal/Unmarshal into
+// map[string]any preserves it exactly -- no need to import jsonschema-go
+// here just to read a field already destined to be embedded verbatim into
+// this same request's JSON body.
+func functionParameters(fd *genai.FunctionDeclaration) map[string]any {
+	if fd.ParametersJsonSchema != nil {
+		if b, err := json.Marshal(fd.ParametersJsonSchema); err == nil {
+			var params map[string]any
+			if err := json.Unmarshal(b, &params); err == nil && len(params) > 0 {
+				return params
+			}
+		}
+	}
+	// Fallback for a tool that (unlike every current Botson tool) sets the
+	// older Parameters field instead.
+	if params := schemaToJSONSchema(fd.Parameters); params != nil {
+		return params
+	}
+	// OpenAI-compatible APIs expect "parameters" to always be a valid JSON
+	// Schema object, even for a tool that takes no arguments -- omitting it
+	// entirely is spec-incorrect and some backends behind OpenRouter reject it.
+	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
 // schemaToJSONSchema converts a genai.Schema (Gemini's OpenAPI-3.0-flavored

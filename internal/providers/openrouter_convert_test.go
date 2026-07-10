@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/genai"
 )
 
@@ -143,6 +145,74 @@ func TestFromChatResponse_MultiToolCall(t *testing.T) {
 	if out.UsageMetadata == nil || out.UsageMetadata.PromptTokenCount != 10 || out.UsageMetadata.CandidatesTokenCount != 5 {
 		t.Errorf("UsageMetadata = %+v", out.UsageMetadata)
 	}
+}
+
+// writeFileArgsLike mirrors internal/tools.WriteFileArgs's shape closely
+// enough to exercise the same jsonschema-tag-driven schema generation a
+// real Botson tool goes through.
+type writeFileArgsLike struct {
+	FilePath string `json:"filePath" jsonschema:"The path to write to."`
+	Content  string `json:"content" jsonschema:"The full text content to write."`
+}
+
+// TestToTools_UsesParametersJsonSchema is a regression test for the bug
+// where OpenRouter tool calls guessed wrong argument names (e.g. "path"
+// instead of "filePath"): ADK's functiontool.New only ever populates
+// FunctionDeclaration.ParametersJsonSchema, never the older Parameters
+// (*genai.Schema) field toTools originally read -- so every tool's
+// "parameters" sent to OpenRouter was silently the empty-object fallback,
+// regardless of the tool's real arguments. This builds a tool exactly the
+// way internal/agent/registry.go does and checks the real declaration
+// toTools produces actually names its arguments.
+func TestToTools_UsesParametersJsonSchema(t *testing.T) {
+	tl, err := functiontool.New(functiontool.Config{
+		Name:        "writeFile",
+		Description: "Writes a file.",
+	}, func(_ agent.Context, _ writeFileArgsLike) (map[string]any, error) {
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("functiontool.New: %v", err)
+	}
+	ft, ok := tl.(interface {
+		Declaration() *genai.FunctionDeclaration
+	})
+	if !ok {
+		t.Fatalf("tool does not expose Declaration()")
+	}
+	decl := ft.Declaration()
+
+	if decl.Parameters != nil {
+		t.Fatalf("test assumption broken: functiontool.New now sets Parameters directly (%+v); functionParameters's fallback path may be dead code worth revisiting", decl.Parameters)
+	}
+	if decl.ParametersJsonSchema == nil {
+		t.Fatalf("test assumption broken: functiontool.New no longer sets ParametersJsonSchema")
+	}
+
+	out := toTools([]*genai.Tool{{FunctionDeclarations: []*genai.FunctionDeclaration{decl}}})
+	if len(out) != 1 {
+		t.Fatalf("got %d tools, want 1", len(out))
+	}
+
+	params := out[0].Function.Parameters
+	props, ok := params["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties not a map: %+v", params)
+	}
+	if _, ok := props["filePath"]; !ok {
+		t.Errorf("properties missing %q, got keys %v (this is the exact bug: the model sees no real argument names)", "filePath", mapKeys(props))
+	}
+	if _, ok := props["content"]; !ok {
+		t.Errorf("properties missing %q, got keys %v", "content", mapKeys(props))
+	}
+}
+
+func mapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func TestSchemaToJSONSchema_NestedObjectAndArray(t *testing.T) {
